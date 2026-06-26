@@ -8,7 +8,11 @@ import {
   orderAwaitingPaymentEmail,
   orderPaidEmail,
   adminReplyEmail,
+  adminNewOrderEmail,
+  adminSupportMessageEmail,
+  adminPaymentReceivedEmail,
   sendEmail,
+  sendAdminEmail,
 } from "@/lib/email";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
 import { initializePaystackPayment } from "@/lib/paystack";
@@ -19,14 +23,33 @@ function appUrl(path: string) {
   return `${base}${path}`;
 }
 
-function emailFromPhone(phone: string) {
+function normalizeCustomerEmail(email?: string | null) {
+  const trimmed = email?.trim().toLowerCase();
+  return trimmed || null;
+}
+
+function paystackEmailForOrder(phone: string, email?: string | null) {
+  const normalized = normalizeCustomerEmail(email);
+  if (normalized) return normalized;
+
   const digits = phone.replace(/\D/g, "");
   return `customer+${digits}@mamapeace.local`;
+}
+
+async function sendCustomerEmail(
+  email: string | null | undefined,
+  content: { subject: string; html: string }
+) {
+  const to = normalizeCustomerEmail(email);
+  if (!to) return { success: true as const, skipped: true as const };
+
+  return sendEmail({ to, ...content });
 }
 
 export async function createOrderAction(data: {
   customerName: string;
   phoneNumber: string;
+  customerEmail?: string;
   gpsAddress: string;
   locationDescription?: string;
   itemsRequested: string;
@@ -39,6 +62,7 @@ export async function createOrderAction(data: {
       referenceNumber,
       customerName: data.customerName.trim(),
       phoneNumber: data.phoneNumber.trim(),
+      customerEmail: normalizeCustomerEmail(data.customerEmail),
       gpsAddress: data.gpsAddress.trim(),
       locationDescription: data.locationDescription?.trim() || null,
       itemsRequested: data.itemsRequested.trim(),
@@ -54,10 +78,17 @@ export async function createOrderAction(data: {
     trackUrl,
   });
 
-  await sendEmail({
-    to: emailFromPhone(order.phoneNumber),
-    ...emailContent,
-  });
+  await sendCustomerEmail(order.customerEmail, emailContent);
+
+  await sendAdminEmail(
+    adminNewOrderEmail({
+      customerName: order.customerName,
+      phoneNumber: order.phoneNumber,
+      referenceNumber: order.referenceNumber,
+      itemsRequested: order.itemsRequested,
+      adminUrl: appUrl(`/admin/orders/${order.id}`),
+    })
+  );
 
   revalidatePath("/admin");
   return { referenceNumber: order.referenceNumber };
@@ -112,7 +143,7 @@ export async function approveOrderAction(data: {
   let paymentUrl = trackUrl;
   try {
     const paymentInit = await initializePaystackPayment({
-      email: emailFromPhone(order.phoneNumber),
+      email: paystackEmailForOrder(order.phoneNumber, order.customerEmail),
       amountGhs: totalAmount,
       reference: `MP-${order.referenceNumber}-${Date.now()}`,
       metadata: {
@@ -134,10 +165,7 @@ export async function approveOrderAction(data: {
     adminMessage: order.adminMessage,
   });
 
-  await sendEmail({
-    to: emailFromPhone(order.phoneNumber),
-    ...emailContent,
-  });
+  await sendCustomerEmail(order.customerEmail, emailContent);
 
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
@@ -149,31 +177,42 @@ export async function replyToOrderAction(data: {
   orderId: string;
   message: string;
 }) {
+  return sendOrderMessageAction(data);
+}
+
+export async function sendOrderMessageAction(data: {
+  orderId: string;
+  message: string;
+}) {
+  const message = data.message.trim();
+  if (!message) {
+    return { success: false as const, error: "Message cannot be empty" };
+  }
+
   const order = await prisma.order.update({
     where: { id: data.orderId },
     data: {
-      adminMessage: data.message.trim(),
-      status: "PENDING_REVIEW",
+      adminMessage: message,
     },
   });
 
-  const trackUrl = appUrl(`/track/${order.referenceNumber}`);
+  const trackUrl = appUrl(`/track/${order.referenceNumber}?phone=${encodeURIComponent(order.phoneNumber)}`);
   const emailContent = adminReplyEmail({
     customerName: order.customerName,
     referenceNumber: order.referenceNumber,
-    message: data.message.trim(),
+    message,
     trackUrl,
   });
 
-  await sendEmail({
-    to: emailFromPhone(order.phoneNumber),
-    ...emailContent,
-  });
+  const emailResult = await sendCustomerEmail(order.customerEmail, emailContent);
 
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
 
-  return { success: true as const };
+  return {
+    success: true as const,
+    emailed: !("skipped" in emailResult && emailResult.skipped),
+  };
 }
 
 export async function updateOrderStatusAction(data: {
@@ -237,10 +276,17 @@ export async function markOrderPaidAction(orderId: string, transactionReference:
     trackUrl,
   });
 
-  await sendEmail({
-    to: emailFromPhone(order.phoneNumber),
-    ...emailContent,
-  });
+  await sendCustomerEmail(order.customerEmail, emailContent);
+
+  await sendAdminEmail(
+    adminPaymentReceivedEmail({
+      customerName: order.customerName,
+      phoneNumber: order.phoneNumber,
+      referenceNumber: order.referenceNumber,
+      totalAmount: order.totalAmount ?? 0,
+      adminUrl: appUrl(`/admin/orders/${order.id}`),
+    })
+  );
 
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
@@ -254,7 +300,7 @@ export async function createComplaintAction(data: {
   category: string;
   message: string;
 }) {
-  await prisma.complaint.create({
+  const complaint = await prisma.complaint.create({
     data: {
       name: data.name.trim(),
       phoneNumber: data.phoneNumber.trim(),
@@ -262,6 +308,16 @@ export async function createComplaintAction(data: {
       message: data.message.trim(),
     },
   });
+
+  await sendAdminEmail(
+    adminSupportMessageEmail({
+      name: complaint.name,
+      phoneNumber: complaint.phoneNumber,
+      category: complaint.category,
+      message: complaint.message,
+      adminUrl: appUrl("/admin"),
+    })
+  );
 
   revalidatePath("/admin");
   return { success: true as const };

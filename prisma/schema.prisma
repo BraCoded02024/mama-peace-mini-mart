@@ -22,6 +22,7 @@ model Order {
   referenceNumber      String      @unique
   customerName         String
   phoneNumber          String
+  customerEmail        String?
   gpsAddress           String
   locationDescription  String?
   itemsRequested       String

@@ -12,6 +12,7 @@ import {
 export type OrderDraft = {
   customerName: string;
   phoneNumber: string;
+  customerEmail: string;
   gpsAddress: string;
   locationDescription: string;
   itemsRequested: string;
@@ -23,6 +24,7 @@ const STORAGE_KEY = "mama_peace_order_draft";
 const emptyDraft: OrderDraft = {
   customerName: "",
   phoneNumber: "",
+  customerEmail: "",
   gpsAddress: "",
   locationDescription: "",
   itemsRequested: "",

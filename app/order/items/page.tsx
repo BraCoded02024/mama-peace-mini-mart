@@ -42,6 +42,7 @@ export default function OrderItemsPage() {
       const result = await createOrderAction({
         customerName: draft.customerName,
         phoneNumber: draft.phoneNumber,
+        customerEmail: draft.customerEmail,
         gpsAddress: draft.gpsAddress,
         locationDescription: draft.locationDescription,
         itemsRequested: draft.itemsRequested,

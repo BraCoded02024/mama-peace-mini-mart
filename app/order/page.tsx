@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { User, Phone, MapPin, Map, ArrowRight, CheckCircle2, Bike } from "lucide-react";
+import { User, Phone, Mail, ArrowRight, CheckCircle2, Bike } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { OrderStepper } from "@/components/order/order-stepper";
 import { useOrderDraft } from "@/components/order/order-draft-context";
+import { LocationAddressField } from "@/components/order/location-address-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,26 +75,40 @@ export default function OrderDetailsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gpsAddress">GPS Address (Digital Address)</Label>
+              <Label htmlFor="customerEmail">
+                Email Address <span className="font-normal text-mama-muted">(Optional)</span>
+              </Label>
               <div className="relative">
                 <Input
-                  id="gpsAddress"
-                  value={draft.gpsAddress}
-                  onChange={(e) => updateDraft({ gpsAddress: e.target.value })}
-                  placeholder="GA-123-4567"
-                  required
+                  id="customerEmail"
+                  type="email"
+                  value={draft.customerEmail}
+                  onChange={(e) => updateDraft({ customerEmail: e.target.value })}
+                  placeholder="you@example.com"
+                  className="pr-10"
                 />
-                <MapPin className="absolute right-3 top-3.5 h-5 w-5 text-mama-muted" />
+                <Mail className="absolute right-3 top-3.5 h-5 w-5 text-mama-muted" />
               </div>
-              <p className="text-xs text-mama-muted">Example: GA-123-4567</p>
+              <p className="text-xs text-mama-muted">
+                Add an email if you want order updates and receipts sent to your inbox.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gpsAddress">Delivery Address / GPS Code</Label>
+              <LocationAddressField
+                id="gpsAddress"
+                value={draft.gpsAddress}
+                onChange={(gpsAddress) => updateDraft({ gpsAddress })}
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="locationDescription">
                 Additional Location Description
               </Label>
-              <div className="relative">
-                <Textarea
+              <Textarea
                   id="locationDescription"
                   value={draft.locationDescription}
                   onChange={(e) =>
@@ -102,8 +117,6 @@ export default function OrderDetailsPage() {
                   placeholder="Near Ecobank Junction, the blue gate opposite the bakery..."
                   className="min-h-[100px]"
                 />
-                <Map className="absolute bottom-3 right-3 h-5 w-5 text-mama-muted" />
-              </div>
               <p className="text-xs text-mama-muted">
                 Be descriptive to help our riders find you easily.
               </p>

@@ -7,7 +7,10 @@ function Label({
 }: React.ComponentProps<"label">) {
   return (
     <label
-      className={cn("text-sm font-medium text-mama-ink", className)}
+      className={cn(
+        "mb-0.5 block text-[13px] font-semibold tracking-[-0.01em] text-mama-ink",
+        className
+      )}
       {...props}
     />
   );

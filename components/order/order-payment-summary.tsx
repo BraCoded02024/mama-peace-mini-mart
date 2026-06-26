@@ -1,4 +1,4 @@
-import { CreditCard, MapPin, Phone, User } from "lucide-react";
+import { CreditCard, Mail, MapPin, Phone, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayNowButton } from "@/components/order/pay-now-button";
 import { formatCurrency } from "@/lib/utils";
@@ -15,6 +15,7 @@ type OrderItem = {
 type OrderPaymentSummaryProps = {
   referenceNumber: string;
   phoneNumber: string;
+  customerEmail?: string | null;
   customerName: string;
   gpsAddress: string;
   items: OrderItem[];
@@ -28,6 +29,7 @@ type OrderPaymentSummaryProps = {
 export function OrderPaymentSummary({
   referenceNumber,
   phoneNumber,
+  customerEmail,
   customerName,
   gpsAddress,
   items,
@@ -65,6 +67,12 @@ export function OrderPaymentSummary({
               <Phone className="h-4 w-4 shrink-0 text-mama-green" />
               <span>{phoneNumber}</span>
             </div>
+            {customerEmail && (
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 shrink-0 text-mama-green" />
+                <span>{customerEmail}</span>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mama-green" />
               <span>{gpsAddress}</span>

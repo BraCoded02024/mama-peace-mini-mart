@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateReferenceNumber } from "@/lib/reference";
-import { orderSubmittedEmail, sendEmail } from "@/lib/email";
+import { orderSubmittedEmail, adminNewOrderEmail, sendEmail, sendAdminEmail } from "@/lib/email";
 
-function emailFromPhone(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return `customer+${digits}@mamapeace.local`;
+function normalizeCustomerEmail(email?: string | null) {
+  const trimmed = email?.trim().toLowerCase();
+  return trimmed || null;
 }
 
 export async function POST(request: Request) {
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
         referenceNumber,
         customerName: String(body.customerName ?? "").trim(),
         phoneNumber: String(body.phoneNumber ?? "").trim(),
+        customerEmail: normalizeCustomerEmail(String(body.customerEmail ?? "")),
         gpsAddress: String(body.gpsAddress ?? "").trim(),
         locationDescription: body.locationDescription?.trim() || null,
         itemsRequested: String(body.itemsRequested ?? "").trim(),
@@ -34,10 +35,22 @@ export async function POST(request: Request) {
       trackUrl,
     });
 
-    await sendEmail({
-      to: emailFromPhone(order.phoneNumber),
-      ...emailContent,
-    });
+    if (order.customerEmail) {
+      await sendEmail({
+        to: order.customerEmail,
+        ...emailContent,
+      });
+    }
+
+    await sendAdminEmail(
+      adminNewOrderEmail({
+        customerName: order.customerName,
+        phoneNumber: order.phoneNumber,
+        referenceNumber: order.referenceNumber,
+        itemsRequested: order.itemsRequested,
+        adminUrl: `${base}/admin/orders/${order.id}`,
+      })
+    );
 
     return NextResponse.json({
       referenceNumber: order.referenceNumber,

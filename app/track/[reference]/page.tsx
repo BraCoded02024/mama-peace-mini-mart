@@ -19,6 +19,10 @@ import { AdminMessageNotice } from "@/components/order/admin-message-notice";
 import { OrderPaymentSummary } from "@/components/order/order-payment-summary";
 import { PaymentCallbackHandler } from "@/components/order/payment-callback-handler";
 
+function normalizePhoneDigits(phone: string) {
+  return phone.replace(/\D/g, "");
+}
+
 export default async function TrackOrderDetailPage({
   params,
   searchParams,
@@ -39,7 +43,10 @@ export default async function TrackOrderDetailPage({
     notFound();
   }
 
-  if (phone && order.phoneNumber !== phone) {
+  if (
+    phone &&
+    normalizePhoneDigits(order.phoneNumber) !== normalizePhoneDigits(phone)
+  ) {
     notFound();
   }
 
@@ -175,6 +182,7 @@ export default async function TrackOrderDetailPage({
         <OrderPaymentSummary
           referenceNumber={order.referenceNumber}
           phoneNumber={order.phoneNumber}
+          customerEmail={order.customerEmail}
           customerName={order.customerName}
           gpsAddress={order.gpsAddress}
           items={order.items}

@@ -56,9 +56,9 @@ export default async function OrderSuccessPage({
                 <div>
                   <p className="font-medium">What&apos;s Next?</p>
                   <p className="mt-1 text-sm text-mama-muted">
-                    Mama Peace is reviewing your request. You&apos;ll receive an
-                    email once pricing is confirmed or if we need to update you
-                    on availability.
+                    Mama Peace is reviewing your request. Keep this reference
+                    number safe and use Track Order for updates. If you added an
+                    email, we&apos;ll also send updates to your inbox.
                   </p>
                 </div>
               </div>
