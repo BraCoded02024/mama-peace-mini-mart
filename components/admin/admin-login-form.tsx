@@ -108,7 +108,7 @@ export function AdminLoginForm() {
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin@mama-peace-mini-mart"
+                  placeholder="Enter your username"
                   className="pl-11"
                   autoComplete="username"
                   required
