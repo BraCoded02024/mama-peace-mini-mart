@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fdfcf8;
+  --foreground: #1a1a1a;
+  --mama-cream: #fdfcf8;
+  --mama-green: #063328;
+  --mama-green-light: #0a4d3c;
+  --mama-brown: #8b5e3c;
+  --mama-orange: #f59e0b;
+  --mama-orange-dark: #b45309;
+  --mama-gray: #f3f4f6;
+  --mama-input: #f5f5f4;
+  --mama-border: #e7e5e4;
+  --mama-muted: #78716c;
+  --mama-ink: #1c1917;
+  --mama-peach: #ffd8b1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-mama-cream: var(--mama-cream);
+  --color-mama-green: var(--mama-green);
+  --color-mama-green-light: var(--mama-green-light);
+  --color-mama-brown: var(--mama-brown);
+  --color-mama-orange: var(--mama-orange);
+  --color-mama-orange-dark: var(--mama-orange-dark);
+  --color-mama-gray: var(--mama-gray);
+  --color-mama-input: var(--mama-input);
+  --color-mama-border: var(--mama-border);
+  --color-mama-muted: var(--mama-muted);
+  --color-mama-ink: var(--mama-ink);
+  --color-mama-peach: var(--mama-peach);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-playfair);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-serif {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+.pin-pattern {
+  background-image: radial-gradient(circle at 1px 1px, #d6d3d1 1px, transparent 0);
+  background-size: 24px 24px;
+}
