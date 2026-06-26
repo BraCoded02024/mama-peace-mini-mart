@@ -53,7 +53,6 @@ export function LocationAddressField({
 
       try {
         const L = await import("leaflet");
-        await import("leaflet/dist/leaflet.css");
 
         if (cancelled || !mapContainerRef.current) return;
 
