@@ -7,6 +7,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DeliveryStatusGrid } from "@/components/order/trust-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
+import { isValidPhoneNumber } from "@/lib/phone";
 import { Card, CardContent } from "@/components/ui/card";
 import { ORDER_STATUS_LABELS } from "@/lib/constants";
 import { formatCurrency } from "@/lib/utils";
@@ -50,6 +52,12 @@ export default function TrackPage() {
     e.preventDefault();
     setError("");
     setMatches([]);
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      setError("Enter a valid 10-digit phone number.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -93,11 +101,10 @@ export default function TrackPage() {
       <Card className="mt-6">
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              type="tel"
-              placeholder="Phone Number"
+            <PhoneNumberInput
+              placeholder="10-digit phone number"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={setPhoneNumber}
               required
             />
             <Input

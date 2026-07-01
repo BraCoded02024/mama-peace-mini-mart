@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { OrderStepper } from "@/components/order/order-stepper";
 import { useOrderDraft } from "@/components/order/order-draft-context";
 import { createOrderAction } from "@/app/actions/orders";
+import { isValidPhoneNumber } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +31,7 @@ export default function OrderItemsPage() {
 
     if (
       !draft.customerName.trim() ||
-      !draft.phoneNumber.trim() ||
+      !isValidPhoneNumber(draft.phoneNumber) ||
       !draft.gpsAddress.trim()
     ) {
       router.push("/order");

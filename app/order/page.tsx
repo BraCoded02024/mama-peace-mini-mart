@@ -8,6 +8,8 @@ import { useOrderDraft } from "@/components/order/order-draft-context";
 import { LocationAddressField } from "@/components/order/location-address-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
+import { isValidPhoneNumber } from "@/lib/phone";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +22,7 @@ export default function OrderDetailsPage() {
     e.preventDefault();
     if (
       !draft.customerName.trim() ||
-      !draft.phoneNumber.trim() ||
+      !isValidPhoneNumber(draft.phoneNumber) ||
       !draft.gpsAddress.trim()
     ) {
       return;
@@ -62,12 +64,10 @@ export default function OrderDetailsPage() {
             <div className="space-y-2">
               <Label htmlFor="phoneNumber">Phone Number</Label>
               <div className="relative">
-                <Input
+                <PhoneNumberInput
                   id="phoneNumber"
-                  type="tel"
                   value={draft.phoneNumber}
-                  onChange={(e) => updateDraft({ phoneNumber: e.target.value })}
-                  placeholder="e.g. 024 123 4567"
+                  onChange={(phoneNumber) => updateDraft({ phoneNumber })}
                   required
                 />
                 <Phone className="absolute right-3 top-3.5 h-5 w-5 text-mama-muted" />

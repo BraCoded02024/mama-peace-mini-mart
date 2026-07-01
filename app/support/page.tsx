@@ -16,6 +16,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { createComplaintAction } from "@/app/actions/orders";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneNumberInput } from "@/components/ui/phone-number-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -212,12 +213,11 @@ export default function SupportPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input
+                <PhoneNumberInput
                   id="phone"
-                  type="tel"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="So we can reach you"
+                  onChange={setPhoneNumber}
+                  placeholder="10-digit number so we can reach you"
                   required
                 />
               </div>
