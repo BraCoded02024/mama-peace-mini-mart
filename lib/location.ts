@@ -110,6 +110,45 @@ export function formatReverseGeocodeLabel(data: NominatimReverseResponse): strin
   return "Selected delivery area";
 }
 
+export type GeocodeSearchResult = {
+  lat: number;
+  lng: number;
+  label: string;
+  displayName: string;
+};
+
+type NominatimSearchResponse = Array<{
+  lat: string;
+  lon: string;
+  display_name?: string;
+  address?: NominatimAddress;
+}>;
+
+export function formatGeocodeSearchResult(
+  item: NominatimSearchResponse[number]
+): GeocodeSearchResult {
+  const lat = Number.parseFloat(item.lat);
+  const lng = Number.parseFloat(item.lon);
+  const label = formatReverseGeocodeLabel({
+    display_name: item.display_name,
+    address: item.address,
+  });
+
+  return {
+    lat,
+    lng,
+    label,
+    displayName: item.display_name ?? label,
+  };
+}
+
+export function normalizeAreaSearchQuery(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) return trimmed;
+  if (/ghana/i.test(trimmed)) return trimmed;
+  return `${trimmed}, Ghana`;
+}
+
 export function resolveOrderMapsUrl(
   gpsAddress: string,
   locationDescription?: string | null

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Crosshair, Loader2, MapPin, X } from "lucide-react";
+import { Crosshair, Loader2, MapPin, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import {
   isBareCoordinates,
   isGhanaPostGps,
   type Coordinates,
+  type GeocodeSearchResult,
 } from "@/lib/location";
 
 export type LocationPickResult = {
@@ -47,6 +48,15 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
   }
 }
 
+async function searchArea(query: string): Promise<GeocodeSearchResult[]> {
+  const response = await fetch(`/api/geocode/search?q=${encodeURIComponent(query)}`);
+
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as { results?: GeocodeSearchResult[] };
+  return data.results ?? [];
+}
+
 export function LocationAddressField({
   id,
   value,
@@ -59,15 +69,20 @@ export function LocationAddressField({
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markerRef = useRef<import("leaflet").Marker | null>(null);
   const geocodeRequestRef = useRef(0);
+  const autoSearchQueryRef = useRef<string | null>(null);
 
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [resolvingArea, setResolvingArea] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [mapError, setMapError] = useState("");
   const [geoError, setGeoError] = useState("");
+  const [searchError, setSearchError] = useState("");
   const [pickedCoords, setPickedCoords] = useState<Coordinates | null>(null);
-  const [resolvedArea, setResolvedArea] = useState("");
+  const [areaSearch, setAreaSearch] = useState("");
+  const [areaName, setAreaName] = useState("");
+  const [searchResults, setSearchResults] = useState<GeocodeSearchResult[]>([]);
   const [landmark, setLandmark] = useState("");
 
   async function updateResolvedArea(coords: Coordinates) {
@@ -78,15 +93,76 @@ export function LocationAddressField({
 
     if (requestId !== geocodeRequestRef.current) return;
 
-    setResolvedArea(label);
+    setAreaName(label);
     setResolvingArea(false);
   }
 
-  function setMarkerPosition(coords: Coordinates, map?: import("leaflet").Map | null) {
+  function setMarkerPosition(
+    coords: Coordinates,
+    map?: import("leaflet").Map | null,
+    refreshLabel = true
+  ) {
     markerRef.current?.setLatLng([coords.lat, coords.lng]);
     map?.panTo([coords.lat, coords.lng]);
     setPickedCoords(coords);
-    void updateResolvedArea(coords);
+    setSearchResults([]);
+    if (refreshLabel) void updateResolvedArea(coords);
+  }
+
+  function applySearchResult(result: GeocodeSearchResult) {
+    setAreaName(result.label);
+    setAreaSearch(result.label);
+    setSearchResults([]);
+    setSearchError("");
+    setMarkerPosition({ lat: result.lat, lng: result.lng }, mapRef.current, false);
+    mapRef.current?.setZoom(16);
+  }
+
+  async function handleAreaSearch(event?: React.FormEvent) {
+    event?.preventDefault();
+
+    const query = areaSearch.trim();
+    if (query.length < 2) {
+      setSearchError("Type at least 2 characters to search your area.");
+      return;
+    }
+
+    setSearching(true);
+    setSearchError("");
+    setGeoError("");
+
+    try {
+      const results = await searchArea(query);
+
+      if (results.length === 0) {
+        setSearchError("Area not found. Try a nearby landmark or drag the pin on the map.");
+        setSearchResults([]);
+        return;
+      }
+
+      if (results.length === 1) {
+        applySearchResult(results[0]);
+        return;
+      }
+
+      setSearchResults(results);
+    } catch {
+      setSearchError("Could not search that area. Try again or drag the pin on the map.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function handleOpenPicker() {
+    const existing = value.trim();
+    if (existing && !isBareCoordinates(existing)) {
+      setAreaSearch(existing);
+      setAreaName(existing);
+      autoSearchQueryRef.current = existing;
+    } else {
+      autoSearchQueryRef.current = null;
+    }
+    setOpen(true);
   }
 
   useEffect(() => {
@@ -102,15 +178,20 @@ export function LocationAddressField({
 
       if (requestId !== geocodeRequestRef.current || cancelled) return;
 
-      setResolvedArea(label);
+      setAreaName(label);
       setResolvingArea(false);
     }
 
-    function placeMarker(coords: Coordinates, map?: import("leaflet").Map | null) {
+    function placeMarker(
+      coords: Coordinates,
+      map?: import("leaflet").Map | null,
+      refreshLabel = true
+    ) {
       markerRef.current?.setLatLng([coords.lat, coords.lng]);
       map?.panTo([coords.lat, coords.lng]);
       setPickedCoords(coords);
-      void updateAreaLabel(coords);
+      setSearchResults([]);
+      if (refreshLabel) void updateAreaLabel(coords);
     }
 
     async function initMap() {
@@ -153,6 +234,28 @@ export function LocationAddressField({
         mapRef.current = map;
         markerRef.current = marker;
         placeMarker(ACCRA_CENTER, map);
+
+        const pendingQuery = autoSearchQueryRef.current;
+        autoSearchQueryRef.current = null;
+
+        if (pendingQuery && !cancelled) {
+          setSearching(true);
+          try {
+            const results = await searchArea(pendingQuery);
+            if (!cancelled && results.length > 0) {
+              const bestMatch = results[0];
+              setAreaName(bestMatch.label);
+              setAreaSearch(bestMatch.label);
+              placeMarker({ lat: bestMatch.lat, lng: bestMatch.lng }, map, false);
+              map.setZoom(16);
+              if (results.length > 1) setSearchResults(results);
+            } else if (!cancelled) {
+              setSearchError("Area not found on the map. Drag the pin to your exact spot.");
+            }
+          } finally {
+            if (!cancelled) setSearching(false);
+          }
+        }
       } catch {
         setMapError("Could not load the map. You can still type your area manually.");
       } finally {
@@ -177,7 +280,8 @@ export function LocationAddressField({
     if (!pickedCoords) return;
 
     setResolvingArea(true);
-    const areaLabel = resolvedArea.trim() || (await reverseGeocode(pickedCoords.lat, pickedCoords.lng));
+    const areaLabel =
+      areaName.trim() || (await reverseGeocode(pickedCoords.lat, pickedCoords.lng));
     setResolvingArea(false);
 
     onChange(areaLabel);
@@ -222,8 +326,11 @@ export function LocationAddressField({
     setOpen(false);
     setMapError("");
     setGeoError("");
+    setSearchError("");
     setPickedCoords(null);
-    setResolvedArea("");
+    setAreaSearch("");
+    setAreaName("");
+    setSearchResults([]);
     setLandmark("");
     geocodeRequestRef.current += 1;
     if (mapRef.current) {
@@ -249,7 +356,7 @@ export function LocationAddressField({
         />
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={handleOpenPicker}
           className="flex shrink-0 flex-col items-center justify-center rounded-xl border-2 border-mama-green bg-mama-green/10 px-3 py-2 text-mama-green transition hover:bg-mama-green hover:text-white"
           aria-label="Pick delivery location on map"
         >
@@ -265,7 +372,7 @@ export function LocationAddressField({
         (e.g. East Legon, Spintex, Madina), your{" "}
         <strong className="font-medium text-mama-ink">Ghana Post GPS code</strong>{" "}
         (GA-123-4567), or tap <strong className="font-medium text-mama-ink">Pick</strong>{" "}
-        to drop a pin on the map.
+        to search your area on the map and drop a pin.
       </p>
 
       {showCoordinateWarning && (
@@ -298,8 +405,7 @@ export function LocationAddressField({
                   Choose delivery location
                 </p>
                 <p className="mt-1 text-sm text-mama-muted">
-                  Drop the pin on your exact spot. We will save the area name for
-                  riders, not raw coordinates.
+                  Search your area by name, then fine-tune the pin on the map.
                 </p>
               </div>
               <button
@@ -313,6 +419,59 @@ export function LocationAddressField({
             </div>
 
             <div className="space-y-3 overflow-y-auto px-5 py-4">
+              <form onSubmit={handleAreaSearch} className="space-y-2">
+                <Label htmlFor="location-area-search">Search your area</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="location-area-search"
+                    value={areaSearch}
+                    onChange={(e) => setAreaSearch(e.target.value)}
+                    placeholder="East Legon, Madina, Spintex..."
+                  />
+                  <Button type="submit" variant="outline" disabled={searching}>
+                    {searching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                    Find
+                  </Button>
+                </div>
+                <p className="text-xs text-mama-muted">
+                  Type your area and tap Find — the map pin will move there. You can
+                  still drag the pin for your exact spot.
+                </p>
+              </form>
+
+              {searchError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {searchError}
+                </p>
+              )}
+
+              {searchResults.length > 1 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-mama-muted">
+                    Matching areas
+                  </p>
+                  <div className="max-h-32 space-y-2 overflow-y-auto">
+                    {searchResults.map((result) => (
+                      <button
+                        key={`${result.lat}-${result.lng}-${result.label}`}
+                        type="button"
+                        onClick={() => applySearchResult(result)}
+                        className="w-full rounded-xl border border-mama-border bg-white px-3 py-2 text-left text-sm transition hover:border-mama-green/40 hover:bg-mama-gray/60"
+                      >
+                        <span className="font-medium text-mama-ink">{result.label}</span>
+                        <span className="mt-0.5 block text-xs text-mama-muted">
+                          {result.displayName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Button
                 type="button"
                 variant="outline"
@@ -349,15 +508,18 @@ export function LocationAddressField({
               )}
 
               {pickedCoords && !mapError && (
-                <div className="rounded-xl border border-mama-border bg-mama-gray/60 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-mama-muted">
-                    Detected area
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-mama-ink">
-                    {resolvingArea ? "Finding area name..." : resolvedArea || "Selected delivery area"}
-                  </p>
-                  <p className="mt-1 text-[11px] text-mama-muted">
-                    Pin: {pickedCoords.lat.toFixed(5)}, {pickedCoords.lng.toFixed(5)}
+                <div className="space-y-2">
+                  <Label htmlFor="location-area-name">Area name for riders</Label>
+                  <Input
+                    id="location-area-name"
+                    value={areaName}
+                    onChange={(e) => setAreaName(e.target.value)}
+                    placeholder="East Legon, Madina..."
+                  />
+                  <p className="text-[11px] text-mama-muted">
+                    {resolvingArea
+                      ? "Updating area from map pin..."
+                      : `Pin: ${pickedCoords.lat.toFixed(5)}, ${pickedCoords.lng.toFixed(5)}`}
                   </p>
                 </div>
               )}
@@ -389,7 +551,7 @@ export function LocationAddressField({
                   type="button"
                   className="flex-1"
                   onClick={handleConfirmMapPick}
-                  disabled={!pickedCoords || !!mapError || resolvingArea}
+                  disabled={!pickedCoords || !!mapError || resolvingArea || !areaName.trim()}
                 >
                   {resolvingArea ? (
                     <>
