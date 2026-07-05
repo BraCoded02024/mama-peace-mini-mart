@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/order/order-status-badge";
 import { AdminSendMessageCard } from "@/components/admin/admin-send-message-card";
+import { resolveOrderMapsUrl, stripMapPinNote } from "@/lib/location";
 import type { Order, OrderItem } from "@prisma/client";
 
 type OrderWithItems = Order & { items: OrderItem[] };
@@ -99,14 +100,9 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
             {order.customerEmail && (
               <InfoRow icon={Mail} label="Email" value={order.customerEmail} />
             )}
-            <InfoRow
-              icon={MapPin}
-              label="Delivery Address"
-              value={
-                order.locationDescription
-                  ? `${order.gpsAddress} — ${order.locationDescription}`
-                  : order.gpsAddress
-              }
+            <DeliveryAddressRow
+              gpsAddress={order.gpsAddress}
+              locationDescription={order.locationDescription}
             />
           </div>
 
@@ -306,6 +302,46 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
           />
         </>
       )}
+    </div>
+  );
+}
+
+function DeliveryAddressRow({
+  gpsAddress,
+  locationDescription,
+}: {
+  gpsAddress: string;
+  locationDescription: string | null;
+}) {
+  const mapsUrl = resolveOrderMapsUrl(gpsAddress, locationDescription);
+  const riderDirections = locationDescription
+    ? stripMapPinNote(locationDescription)
+    : "";
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-mama-border bg-white p-3 sm:col-span-2">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mama-green/10 text-mama-green">
+        <MapPin className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] uppercase tracking-wider text-mama-muted">
+          Delivery Address
+        </p>
+        <p className="break-words text-sm font-medium text-mama-ink">{gpsAddress}</p>
+        {riderDirections && (
+          <p className="mt-2 whitespace-pre-wrap text-sm text-mama-muted">
+            {riderDirections}
+          </p>
+        )}
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex rounded-full bg-mama-green px-4 py-2 text-xs font-semibold text-white transition hover:bg-mama-green-light"
+        >
+          Open in Google Maps
+        </a>
+      </div>
     </div>
   );
 }

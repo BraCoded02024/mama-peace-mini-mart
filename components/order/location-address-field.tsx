@@ -4,48 +4,114 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Loader2, MapPin, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  buildGoogleMapsUrl,
+  isBareCoordinates,
+  isGhanaPostGps,
+  type Coordinates,
+} from "@/lib/location";
+
+export type LocationPickResult = {
+  areaLabel: string;
+  coordinates: Coordinates;
+  googleMapsUrl: string;
+  landmark: string;
+};
 
 type LocationAddressFieldProps = {
   id: string;
   value: string;
   onChange: (value: string) => void;
-  onCoordinatesChange?: (coords: { lat: number; lng: number } | null) => void;
+  onLocationPick?: (result: LocationPickResult) => void;
   placeholder?: string;
   required?: boolean;
 };
 
-const ACCRA_CENTER = { lat: 5.6037, lng: -0.187 };
+const ACCRA_CENTER: Coordinates = { lat: 5.6037, lng: -0.187 };
 
-function formatCoordinates(lat: number, lng: number) {
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const response = await fetch(
+      `/api/geocode/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+    );
+
+    if (!response.ok) return "Selected delivery area";
+
+    const data = (await response.json()) as { label?: string };
+    return data.label?.trim() || "Selected delivery area";
+  } catch {
+    return "Selected delivery area";
+  }
 }
 
 export function LocationAddressField({
   id,
   value,
   onChange,
-  onCoordinatesChange,
-  placeholder = "GA-123-4567 or tap Pick location",
+  onLocationPick,
+  placeholder = "East Legon, Madina, or GA-123-4567",
   required,
 }: LocationAddressFieldProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markerRef = useRef<import("leaflet").Marker | null>(null);
+  const geocodeRequestRef = useRef(0);
 
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [resolvingArea, setResolvingArea] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
   const [mapError, setMapError] = useState("");
   const [geoError, setGeoError] = useState("");
-  const [pickedCoords, setPickedCoords] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
+  const [pickedCoords, setPickedCoords] = useState<Coordinates | null>(null);
+  const [resolvedArea, setResolvedArea] = useState("");
+  const [landmark, setLandmark] = useState("");
+
+  async function updateResolvedArea(coords: Coordinates) {
+    const requestId = ++geocodeRequestRef.current;
+    setResolvingArea(true);
+
+    const label = await reverseGeocode(coords.lat, coords.lng);
+
+    if (requestId !== geocodeRequestRef.current) return;
+
+    setResolvedArea(label);
+    setResolvingArea(false);
+  }
+
+  function setMarkerPosition(coords: Coordinates, map?: import("leaflet").Map | null) {
+    markerRef.current?.setLatLng([coords.lat, coords.lng]);
+    map?.panTo([coords.lat, coords.lng]);
+    setPickedCoords(coords);
+    void updateResolvedArea(coords);
+  }
 
   useEffect(() => {
     if (!open || !mapContainerRef.current || mapRef.current) return;
 
     let cancelled = false;
+
+    async function updateAreaLabel(coords: Coordinates) {
+      const requestId = ++geocodeRequestRef.current;
+      setResolvingArea(true);
+
+      const label = await reverseGeocode(coords.lat, coords.lng);
+
+      if (requestId !== geocodeRequestRef.current || cancelled) return;
+
+      setResolvedArea(label);
+      setResolvingArea(false);
+    }
+
+    function placeMarker(coords: Coordinates, map?: import("leaflet").Map | null) {
+      markerRef.current?.setLatLng([coords.lat, coords.lng]);
+      map?.panTo([coords.lat, coords.lng]);
+      setPickedCoords(coords);
+      void updateAreaLabel(coords);
+    }
 
     async function initMap() {
       setMapLoading(true);
@@ -58,7 +124,7 @@ export function LocationAddressField({
 
         const map = L.map(mapContainerRef.current, {
           center: [ACCRA_CENTER.lat, ACCRA_CENTER.lng],
-          zoom: 13,
+          zoom: 15,
         });
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -77,19 +143,18 @@ export function LocationAddressField({
 
         marker.on("dragend", () => {
           const position = marker.getLatLng();
-          setPickedCoords({ lat: position.lat, lng: position.lng });
+          placeMarker({ lat: position.lat, lng: position.lng });
         });
 
         map.on("click", (event) => {
-          marker.setLatLng(event.latlng);
-          setPickedCoords({ lat: event.latlng.lat, lng: event.latlng.lng });
+          placeMarker({ lat: event.latlng.lat, lng: event.latlng.lng }, map);
         });
 
         mapRef.current = map;
         markerRef.current = marker;
-        setPickedCoords({ lat: ACCRA_CENTER.lat, lng: ACCRA_CENTER.lng });
+        placeMarker(ACCRA_CENTER, map);
       } catch {
-        setMapError("Could not load the map. You can still type your address manually.");
+        setMapError("Could not load the map. You can still type your area manually.");
       } finally {
         if (!cancelled) setMapLoading(false);
       }
@@ -99,6 +164,7 @@ export function LocationAddressField({
 
     return () => {
       cancelled = true;
+      geocodeRequestRef.current += 1;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -107,16 +173,27 @@ export function LocationAddressField({
     };
   }, [open]);
 
-  function applyCoordinates(lat: number, lng: number) {
-    const formatted = formatCoordinates(lat, lng);
-    onChange(formatted);
-    onCoordinatesChange?.({ lat, lng });
-    setGeoError("");
+  async function handleConfirmMapPick() {
+    if (!pickedCoords) return;
+
+    setResolvingArea(true);
+    const areaLabel = resolvedArea.trim() || (await reverseGeocode(pickedCoords.lat, pickedCoords.lng));
+    setResolvingArea(false);
+
+    onChange(areaLabel);
+    onLocationPick?.({
+      areaLabel,
+      coordinates: pickedCoords,
+      googleMapsUrl: buildGoogleMapsUrl(pickedCoords),
+      landmark: landmark.trim(),
+    });
+
+    handleCloseMap();
   }
 
   function handleUseCurrentLocation() {
     if (!navigator.geolocation) {
-      setGeoError("Location is not supported on this device. Please type your address.");
+      setGeoError("Location is not supported on this device. Please type your area.");
       return;
     }
 
@@ -125,29 +202,30 @@ export function LocationAddressField({
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        applyCoordinates(latitude, longitude);
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setMarkerPosition(coords, mapRef.current);
+        mapRef.current?.setZoom(17);
         setLocating(false);
-        setOpen(false);
       },
       () => {
-        setGeoError("Could not get your location. Please type your address or pick on the map.");
+        setGeoError("Could not get your location. Please type your area or pick on the map.");
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
   }
 
-  function handleConfirmMapPick() {
-    if (!pickedCoords) return;
-    applyCoordinates(pickedCoords.lat, pickedCoords.lng);
-    setOpen(false);
-  }
-
   function handleCloseMap() {
     setOpen(false);
     setMapError("");
+    setGeoError("");
     setPickedCoords(null);
+    setResolvedArea("");
+    setLandmark("");
+    geocodeRequestRef.current += 1;
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -155,16 +233,16 @@ export function LocationAddressField({
     }
   }
 
+  const showCoordinateWarning =
+    isBareCoordinates(value) && !isGhanaPostGps(value);
+
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
         <Input
           id={id}
           value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            onCoordinatesChange?.(null);
-          }}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           required={required}
           className="pr-3"
@@ -183,10 +261,19 @@ export function LocationAddressField({
       </div>
 
       <p className="text-xs text-mama-muted">
-        Type your Ghana Post GPS code (e.g. GA-123-4567), or tap{" "}
-        <strong className="font-medium text-mama-ink">Pick</strong> to choose your
-        location on the map or use your current position.
+        Type your <strong className="font-medium text-mama-ink">area or landmark</strong>{" "}
+        (e.g. East Legon, Spintex, Madina), your{" "}
+        <strong className="font-medium text-mama-ink">Ghana Post GPS code</strong>{" "}
+        (GA-123-4567), or tap <strong className="font-medium text-mama-ink">Pick</strong>{" "}
+        to drop a pin on the map.
       </p>
+
+      {showCoordinateWarning && (
+        <p className="text-xs text-amber-700" role="status">
+          Coordinates alone are hard for riders to use. Add your area name or pick
+          on the map so we save a readable address and Google Maps link.
+        </p>
+      )}
 
       {geoError && (
         <p className="text-xs text-red-600" role="alert">
@@ -211,8 +298,8 @@ export function LocationAddressField({
                   Choose delivery location
                 </p>
                 <p className="mt-1 text-sm text-mama-muted">
-                  Tap the map to drop a pin, drag it to adjust, or use your
-                  current location.
+                  Drop the pin on your exact spot. We will save the area name for
+                  riders, not raw coordinates.
                 </p>
               </div>
               <button
@@ -225,7 +312,7 @@ export function LocationAddressField({
               </button>
             </div>
 
-            <div className="space-y-3 px-5 py-4">
+            <div className="space-y-3 overflow-y-auto px-5 py-4">
               <Button
                 type="button"
                 variant="outline"
@@ -262,10 +349,32 @@ export function LocationAddressField({
               )}
 
               {pickedCoords && !mapError && (
-                <p className="text-xs text-mama-muted">
-                  Selected: {formatCoordinates(pickedCoords.lat, pickedCoords.lng)}
-                </p>
+                <div className="rounded-xl border border-mama-border bg-mama-gray/60 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-mama-muted">
+                    Detected area
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-mama-ink">
+                    {resolvingArea ? "Finding area name..." : resolvedArea || "Selected delivery area"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-mama-muted">
+                    Pin: {pickedCoords.lat.toFixed(5)}, {pickedCoords.lng.toFixed(5)}
+                  </p>
+                </div>
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="location-landmark">
+                  House number / landmark{" "}
+                  <span className="font-normal text-mama-muted">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="location-landmark"
+                  value={landmark}
+                  onChange={(e) => setLandmark(e.target.value)}
+                  placeholder="House 12, blue gate, near Shell filling station..."
+                  className="min-h-[72px]"
+                />
+              </div>
 
               <div className="flex gap-2">
                 <Button
@@ -280,9 +389,16 @@ export function LocationAddressField({
                   type="button"
                   className="flex-1"
                   onClick={handleConfirmMapPick}
-                  disabled={!pickedCoords || !!mapError}
+                  disabled={!pickedCoords || !!mapError || resolvingArea}
                 >
-                  Use this location
+                  {resolvingArea ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving area...
+                    </>
+                  ) : (
+                    "Use this location"
+                  )}
                 </Button>
               </div>
             </div>

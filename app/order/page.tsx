@@ -13,6 +13,7 @@ import { isValidPhoneNumber } from "@/lib/phone";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { mergeLocationDescription } from "@/lib/location";
 
 export default function OrderDetailsPage() {
   const router = useRouter();
@@ -94,18 +95,28 @@ export default function OrderDetailsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="gpsAddress">Delivery Address / GPS Code</Label>
+              <Label htmlFor="gpsAddress">Delivery Area or Address</Label>
               <LocationAddressField
                 id="gpsAddress"
                 value={draft.gpsAddress}
                 onChange={(gpsAddress) => updateDraft({ gpsAddress })}
+                onLocationPick={({ areaLabel, coordinates, landmark }) =>
+                  updateDraft({
+                    gpsAddress: areaLabel,
+                    locationDescription: mergeLocationDescription(
+                      draft.locationDescription,
+                      coordinates,
+                      landmark
+                    ),
+                  })
+                }
                 required
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="locationDescription">
-                Additional Location Description
+                House / Landmark Directions
               </Label>
               <Textarea
                   id="locationDescription"
@@ -113,11 +124,12 @@ export default function OrderDetailsPage() {
                   onChange={(e) =>
                     updateDraft({ locationDescription: e.target.value })
                   }
-                  placeholder="Near Ecobank Junction, the blue gate opposite the bakery..."
+                  placeholder="House 12, blue gate, near Ecobank junction..."
                   className="min-h-[100px]"
                 />
               <p className="text-xs text-mama-muted">
-                Be descriptive to help our riders find you easily.
+                Add clear directions for riders. If you used the map picker, a Google
+                Maps pin is saved here automatically.
               </p>
             </div>
 
