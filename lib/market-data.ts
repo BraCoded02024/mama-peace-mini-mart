@@ -16,7 +16,7 @@ export const marketCategories = [
   { id: "vegetables", name: "Vegetables", image: "/images/market/vegetables.webp" },
   { id: "fruits", name: "Fruits", image: "/images/market/fruits.jpg" },
   { id: "rice-grains", name: "Rice & Grains", image: "/images/market/rice-grains.jpg" },
-  { id: "drinks", name: "Drinks", image: "/images/market/beverages.jfif" },
+  { id: "drinks", name: "Drinks", image: "/images/market/beverages.jpg" },
   { id: "meat-fish", name: "Meat & Fish", image: "/images/market/meat-fish.jpg" },
   { id: "household", name: "Household", image: "/images/market/household.jpg" },
   { id: "toiletries", name: "Toiletries", image: "/images/market/toiletries.jpg" },
@@ -62,7 +62,7 @@ export const marketProducts = [
   {
     id: "beverages",
     name: "Beverages",
-    image: "/images/market/beverages.jfif",
+    image: "/images/market/beverages.jpg",
   },
   {
     id: "meat-fish",
