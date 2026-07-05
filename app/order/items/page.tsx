@@ -59,7 +59,7 @@ export default function OrderItemsPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell showSearch={false}>
       <OrderStepper currentStep={2} />
 
       <div className="mb-6">

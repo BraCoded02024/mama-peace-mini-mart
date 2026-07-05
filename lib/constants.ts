@@ -1,4 +1,4 @@
-export const MIN_ORDER_AMOUNT_GHS = 100;
+export const MIN_ORDER_AMOUNT_GHS = 80;
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   PENDING_REVIEW: "Pending Review",

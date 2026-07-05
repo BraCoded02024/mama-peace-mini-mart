@@ -31,16 +31,15 @@ export default function OrderDetailsPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell showSearch={false}>
       <OrderStepper currentStep={1} />
 
       <div className="mb-6">
-        <h1 className="font-serif text-2xl text-mama-ink">
-          Welcome Back to Mama Peace
+        <h1 className="font-serif text-2xl text-mama-green">
+          Place Your Order
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-mama-muted">
-          Tell us where to deliver your groceries. No account needed — just your
-          details and your shopping list.
+          No account needed — just your details and your shopping list.
         </p>
       </div>
 

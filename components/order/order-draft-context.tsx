@@ -58,6 +58,7 @@ export function OrderDraftProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    window.dispatchEvent(new Event("mama-draft-updated"));
   }, [draft, hydrated]);
 
   const value = useMemo(

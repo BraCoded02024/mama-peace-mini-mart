@@ -54,7 +54,7 @@ export default async function TrackOrderDetailPage({
 
   if (showPaidView && order.verificationCode) {
     return (
-      <AppShell>
+      <AppShell showSearch={false}>
         <Card>
           <CardContent className="space-y-4 pt-8 text-center">
             <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-mama-green">

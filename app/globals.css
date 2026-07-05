@@ -16,6 +16,10 @@
   --mama-muted: #78716c;
   --mama-ink: #1c1917;
   --mama-peach: #ffd8b1;
+  --mama-yellow: #f5c518;
+  --mama-yellow-light: #fff4c2;
+  --mama-yellow-dark: #d4a90f;
+  --mama-beige: #f5efe6;
 }
 
 @theme inline {
@@ -33,6 +37,10 @@
   --color-mama-muted: var(--mama-muted);
   --color-mama-ink: var(--mama-ink);
   --color-mama-peach: var(--mama-peach);
+  --color-mama-yellow: var(--mama-yellow);
+  --color-mama-yellow-light: var(--mama-yellow-light);
+  --color-mama-yellow-dark: var(--mama-yellow-dark);
+  --color-mama-beige: var(--mama-beige);
   --font-sans: var(--font-jakarta);
   --font-serif: var(--font-fraunces);
 }
@@ -69,4 +77,34 @@ button {
 .pin-pattern {
   background-image: radial-gradient(circle at 1px 1px, #d6d3d1 1px, transparent 0);
   background-size: 24px 24px;
+}
+
+@keyframes showcase-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.showcase-marquee-track {
+  animation: showcase-marquee 28s linear infinite;
+}
+
+.showcase-marquee:hover .showcase-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showcase-marquee-track {
+    animation: none;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-bottom: 0.5rem;
+  }
+
+  .showcase-marquee {
+    overflow-x: auto;
+  }
 }

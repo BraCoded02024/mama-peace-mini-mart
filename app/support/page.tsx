@@ -85,7 +85,7 @@ export default function SupportPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell showSearch={false}>
       <div className="mb-5">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-mama-green/10 text-mama-green">

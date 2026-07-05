@@ -86,7 +86,7 @@ export default function TrackPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell showSearch={false}>
       <div className="text-center">
         <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-mama-border bg-mama-gray">
           <MapPin className="h-9 w-9 text-mama-green" />

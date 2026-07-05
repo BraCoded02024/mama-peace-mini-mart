@@ -1,3 +1,5 @@
+import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
+
 type EmailPayload = {
   to: string;
   subject: string;
@@ -20,7 +22,7 @@ function escapeHtml(text: string) {
 
 export async function sendEmail({ to, subject, html }: EmailPayload) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Mama Peace <noreply@mamapeace.com>";
+  const from = process.env.EMAIL_FROM ?? "Mama Peace <orders@mamapeacemart.com>";
 
   if (!apiKey) {
     console.log("[email:dev]", { to, subject, html });
@@ -84,7 +86,7 @@ export function orderAwaitingPaymentEmail(params: {
       <p>Hi ${params.customerName},</p>
       <p>Mama Peace has reviewed your order <strong>${params.referenceNumber}</strong>.</p>
       ${params.adminMessage ? `<p><em>${params.adminMessage}</em></p>` : ""}
-      <p><strong>Total: GHS ${params.totalAmount.toFixed(2)}</strong> (minimum order GHS 100)</p>
+      <p><strong>Total: GHS ${params.totalAmount.toFixed(2)}</strong> (minimum order GHS ${MIN_ORDER_AMOUNT_GHS})</p>
       <p><a href="${params.paymentUrl}">Pay now with Paystack</a></p>
       <p>— Mama Peace Mini Mart</p>
     `,
