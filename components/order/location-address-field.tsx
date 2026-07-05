@@ -9,9 +9,12 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   buildGoogleMapsUrl,
+  deviceLocationErrorMessage,
   isBareCoordinates,
   isGhanaPostGps,
+  requestDeviceLocation,
   type Coordinates,
+  type DeviceLocationErrorCode,
   type GeocodeSearchResult,
 } from "@/lib/location";
 
@@ -76,6 +79,7 @@ export function LocationAddressField({
   const [searching, setSearching] = useState(false);
   const [resolvingArea, setResolvingArea] = useState(false);
   const [mapLoading, setMapLoading] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState("");
   const [geoError, setGeoError] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -97,13 +101,23 @@ export function LocationAddressField({
     setResolvingArea(false);
   }
 
+  function focusMapOnCoords(coords: Coordinates, map?: import("leaflet").Map | null) {
+    const activeMap = map ?? mapRef.current;
+    if (!activeMap) return;
+
+    window.requestAnimationFrame(() => {
+      activeMap.invalidateSize();
+      activeMap.setView([coords.lat, coords.lng], 17, { animate: true });
+    });
+  }
+
   function setMarkerPosition(
     coords: Coordinates,
     map?: import("leaflet").Map | null,
     refreshLabel = true
   ) {
     markerRef.current?.setLatLng([coords.lat, coords.lng]);
-    map?.panTo([coords.lat, coords.lng]);
+    focusMapOnCoords(coords, map);
     setPickedCoords(coords);
     setSearchResults([]);
     if (refreshLabel) void updateResolvedArea(coords);
@@ -115,7 +129,6 @@ export function LocationAddressField({
     setSearchResults([]);
     setSearchError("");
     setMarkerPosition({ lat: result.lat, lng: result.lng }, mapRef.current, false);
-    mapRef.current?.setZoom(16);
   }
 
   async function handleAreaSearch(event?: React.FormEvent) {
@@ -188,7 +201,7 @@ export function LocationAddressField({
       refreshLabel = true
     ) {
       markerRef.current?.setLatLng([coords.lat, coords.lng]);
-      map?.panTo([coords.lat, coords.lng]);
+      focusMapOnCoords(coords, map);
       setPickedCoords(coords);
       setSearchResults([]);
       if (refreshLabel) void updateAreaLabel(coords);
@@ -196,6 +209,7 @@ export function LocationAddressField({
 
     async function initMap() {
       setMapLoading(true);
+      setMapReady(false);
       setMapError("");
 
       try {
@@ -235,6 +249,13 @@ export function LocationAddressField({
         markerRef.current = marker;
         placeMarker(ACCRA_CENTER, map);
 
+        window.requestAnimationFrame(() => {
+          if (!cancelled) {
+            map.invalidateSize();
+            setMapReady(true);
+          }
+        });
+
         const pendingQuery = autoSearchQueryRef.current;
         autoSearchQueryRef.current = null;
 
@@ -267,6 +288,7 @@ export function LocationAddressField({
 
     return () => {
       cancelled = true;
+      setMapReady(false);
       geocodeRequestRef.current += 1;
       if (mapRef.current) {
         mapRef.current.remove();
@@ -295,35 +317,31 @@ export function LocationAddressField({
     handleCloseMap();
   }
 
-  function handleUseCurrentLocation() {
-    if (!navigator.geolocation) {
-      setGeoError("Location is not supported on this device. Please type your area.");
+  async function handleUseCurrentLocation() {
+    if (!mapReady || mapLoading) {
+      setGeoError("Please wait for the map to load, then try again.");
       return;
     }
 
     setLocating(true);
     setGeoError("");
+    setSearchError("");
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setMarkerPosition(coords, mapRef.current);
-        mapRef.current?.setZoom(17);
-        setLocating(false);
-      },
-      () => {
-        setGeoError("Could not get your location. Please type your area or pick on the map.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
+    try {
+      const coords = await requestDeviceLocation();
+      setMarkerPosition(coords, mapRef.current);
+      setAreaSearch("");
+    } catch (error) {
+      const code = (error instanceof Error ? error.message : "timeout") as DeviceLocationErrorCode;
+      setGeoError(deviceLocationErrorMessage(code));
+    } finally {
+      setLocating(false);
+    }
   }
 
   function handleCloseMap() {
     setOpen(false);
+    setMapReady(false);
     setMapError("");
     setGeoError("");
     setSearchError("");
@@ -477,15 +495,31 @@ export function LocationAddressField({
                 variant="outline"
                 className="w-full"
                 onClick={handleUseCurrentLocation}
-                disabled={locating}
+                disabled={locating || mapLoading || !mapReady}
               >
                 {locating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Crosshair className="h-4 w-4" />
                 )}
-                {locating ? "Getting your location..." : "Use my current location"}
+                {locating
+                  ? "Getting your location..."
+                  : mapLoading || !mapReady
+                    ? "Waiting for map..."
+                    : "Use my current location"}
               </Button>
+
+              {geoError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {geoError}
+                </p>
+              )}
+
+              <p className="text-xs text-mama-muted">
+                Your phone may ask to allow location access. Choose{" "}
+                <strong className="font-medium text-mama-ink">Allow</strong> so we
+                can place the pin on your delivery spot.
+              </p>
 
               <div
                 className={cn(
