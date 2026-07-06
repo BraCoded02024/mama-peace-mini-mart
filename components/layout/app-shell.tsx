@@ -244,12 +244,12 @@ export function AppHeader({ showSearch = true }: { showSearch?: boolean }) {
 function DesktopBrandPanel() {
   return (
     <aside className="hidden lg:flex lg:h-full lg:min-h-0 lg:w-[400px] lg:shrink-0 lg:flex-col lg:overflow-hidden lg:rounded-[2rem] lg:border lg:border-mama-border lg:bg-white lg:shadow-2xl xl:w-[440px]">
-      <div className="relative h-[168px] w-full shrink-0 xl:h-[176px]">
+      <div className="relative h-[212px] w-full shrink-0 xl:h-[228px]">
         <Image
-          src="/images/market/home.png"
+          src="/images/market/homenew.png"
           alt="Mama Peace Mini Mart"
           fill
-          className="object-cover object-top"
+          className="object-cover object-[50%_38%]"
           sizes="440px"
           priority
         />

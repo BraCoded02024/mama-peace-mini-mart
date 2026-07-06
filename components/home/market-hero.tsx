@@ -29,13 +29,13 @@ export function MarketFeatures() {
 export function MarketHero() {
   return (
     <section className="overflow-hidden rounded-2xl">
-      {/* home.png is 1536×1024 — button sits lower-left under the copy */}
-      <div className="relative w-full max-lg:aspect-[3/2] lg:h-[168px]">
+      {/* homenew.png — Shop Now tap overlay sits lower-left under the copy */}
+      <div className="relative w-full max-lg:aspect-[3/2] lg:h-[212px] xl:h-[228px]">
         <Image
-          src="/images/market/home.png"
+          src="/images/market/homenew.png"
           alt="Your Trusted Mini Mart — Mama Peace"
           fill
-          className="object-cover max-lg:object-center lg:object-top"
+          className="object-cover max-lg:object-center lg:object-[50%_38%]"
           priority
           sizes="(max-width: 440px) 100vw, 440px"
         />
