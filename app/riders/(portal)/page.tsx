@@ -6,25 +6,36 @@ import { getRiderSession } from "@/lib/rider-auth";
 import { riderLogoutAction } from "@/app/actions/rider-auth";
 import { AvailableOrdersList } from "@/components/rider/available-orders-list";
 import { CurrentDeliveryCard } from "@/components/rider/current-delivery-card";
+import { RiderPortalError } from "@/components/rider/rider-portal-error";
 import { Badge } from "@/components/ui/badge";
 
 export default async function RiderPortalPage() {
   const session = await getRiderSession();
   if (!session) redirect("/riders/login");
 
-  const [availableOrders, currentDelivery] = await Promise.all([
-    prisma.order.findMany({
-      where: { status: "READY_FOR_PICKUP" },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.order.findFirst({
-      where: {
-        assignedRiderId: session.id,
-        status: { in: ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"] },
-      },
-      orderBy: { assignedAt: "desc" },
-    }),
-  ]);
+  let availableOrders;
+  let currentDelivery;
+
+  try {
+    [availableOrders, currentDelivery] = await Promise.all([
+      prisma.order.findMany({
+        where: { status: "READY_FOR_PICKUP" },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.order.findFirst({
+        where: {
+          assignedRiderId: session.id,
+          status: { in: ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"] },
+        },
+        orderBy: { updatedAt: "desc" },
+      }),
+    ]);
+  } catch (error) {
+    console.error("[riders] failed to load portal data", error);
+    return (
+      <RiderPortalError message="Could not load orders. The production database may need the rider schema update." />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-mama-green/5">

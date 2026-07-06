@@ -11,13 +11,15 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 function getSecret() {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) {
-    throw new Error("ADMIN_SECRET is not configured");
+    return null;
   }
   return secret;
 }
 
 function signPayload(payload: string) {
-  return createHmac("sha256", getSecret()).update(payload).digest("hex");
+  const secret = getSecret();
+  if (!secret) return "";
+  return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
 function createSessionToken(riderId: string) {
@@ -77,6 +79,13 @@ export async function loginRider(phone: string, pin: string) {
     return { success: false as const, error: "Invalid credentials" };
   }
 
+  if (!getSecret()) {
+    return {
+      success: false as const,
+      error: "Rider login is not configured on the server. Contact the store admin.",
+    };
+  }
+
   const token = createSessionToken(rider.id);
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
@@ -96,26 +105,31 @@ export async function logoutRider() {
 }
 
 export async function getRiderSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-  if (!token) return null;
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value;
+    if (!token) return null;
 
-  const riderId = verifySessionToken(token);
-  if (!riderId) return null;
+    const riderId = verifySessionToken(token);
+    if (!riderId) return null;
 
-  const rider = await prisma.rider.findUnique({
-    where: { id: riderId },
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-      area: true,
-      motorbikeNumber: true,
-      status: true,
-    },
-  });
+    const rider = await prisma.rider.findUnique({
+      where: { id: riderId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        area: true,
+        motorbikeNumber: true,
+        status: true,
+      },
+    });
 
-  if (!rider || rider.status !== "ACTIVE") return null;
+    if (!rider || rider.status !== "ACTIVE") return null;
 
-  return rider;
+    return rider;
+  } catch (error) {
+    console.error("[rider-auth] getRiderSession failed", error);
+    return null;
+  }
 }
