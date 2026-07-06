@@ -11,14 +11,11 @@ import {
   ShoppingBasket,
   Tag,
   KeyRound,
-  Package,
-  Truck,
-  CheckCheck,
   Loader2,
 } from "lucide-react";
 import {
   approveOrderAction,
-  updateOrderStatusAction,
+  markOrderReadyForPickupAction,
 } from "@/app/actions/orders";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -30,9 +27,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/order/order-status-badge";
 import { AdminSendMessageCard } from "@/components/admin/admin-send-message-card";
 import { resolveOrderMapsUrl, stripMapPinNote } from "@/lib/location";
-import type { Order, OrderItem } from "@prisma/client";
+import type { Order, OrderItem, Rider } from "@prisma/client";
 
-type OrderWithItems = Order & { items: OrderItem[] };
+type OrderWithItems = Order & {
+  items: OrderItem[];
+  assignedRider?: Rider | null;
+};
 
 export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
   const router = useRouter();
@@ -70,10 +70,15 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
     router.refresh();
   }
 
-  async function handleStatus(status: "PREPARING" | "ON_THE_WAY" | "DELIVERED") {
+  async function handleReadyForPickup() {
     setLoading(true);
-    await updateOrderStatusAction({ orderId: order.id, status });
+    setError("");
+    const result = await markOrderReadyForPickupAction(order.id);
     setLoading(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -244,26 +249,71 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
         </>
       )}
 
-      {order.status === "PAID" && (
+      {order.status === "PAYMENT_CONFIRMED" && (
         <Card>
           <CardContent className="space-y-3 pt-6">
             <h3 className="font-serif text-lg text-mama-ink">
-              Update Delivery Status
+              Ready for Rider Pickup
             </h3>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <Button onClick={() => handleStatus("PREPARING")} disabled={loading}>
-                <Package className="h-4 w-4" />
-                Preparing
-              </Button>
-              <Button onClick={() => handleStatus("ON_THE_WAY")} disabled={loading}>
-                <Truck className="h-4 w-4" />
-                On the Way
-              </Button>
-              <Button onClick={() => handleStatus("DELIVERED")} disabled={loading}>
-                <CheckCheck className="h-4 w-4" />
-                Delivered
-              </Button>
-            </div>
+            <p className="text-sm text-mama-muted">
+              Mark this order ready when packed. Riders will only see it after
+              you confirm.
+            </p>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            <Button onClick={handleReadyForPickup} disabled={loading} className="w-full">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Mark Ready for Pickup
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {order.status === "READY_FOR_PICKUP" && (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-mama-muted">
+              This order is visible to active riders and waiting for acceptance.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {(order.status === "RIDER_ASSIGNED" ||
+        order.status === "OUT_FOR_DELIVERY") && (
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            <h3 className="font-serif text-lg text-mama-ink">Rider Assignment</h3>
+            {order.assignedRider ? (
+              <div className="rounded-xl border border-mama-border bg-mama-gray p-4 text-sm">
+                <p className="font-medium text-mama-ink">{order.assignedRider.name}</p>
+                <p className="text-mama-muted">{order.assignedRider.phone}</p>
+                <p className="text-mama-muted">{order.assignedRider.area}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-mama-muted">Rider details unavailable.</p>
+            )}
+            {order.assignedAt && (
+              <p className="text-xs text-mama-muted">
+                Assigned {formatDate(order.assignedAt)}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {order.status === "DELIVERED" && order.assignedRider && (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-mama-muted">
+              Delivered by{" "}
+              <span className="font-medium text-mama-ink">
+                {order.assignedRider.name}
+              </span>
+            </p>
           </CardContent>
         </Card>
       )}

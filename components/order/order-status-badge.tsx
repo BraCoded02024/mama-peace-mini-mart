@@ -4,13 +4,17 @@ import type { OrderStatus } from "@prisma/client";
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const variant =
-    status === "PAID" || status === "DELIVERED"
+    status === "PAYMENT_CONFIRMED" ||
+    status === "DELIVERED" ||
+    status === "READY_FOR_PICKUP"
       ? "success"
       : status === "PENDING_REVIEW" || status === "AWAITING_PAYMENT"
         ? "warning"
         : status === "CANCELLED"
           ? "muted"
-          : "default";
+          : status === "RIDER_ASSIGNED" || status === "OUT_FOR_DELIVERY"
+            ? "default"
+            : "default";
 
   return (
     <Badge variant={variant}>

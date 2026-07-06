@@ -36,7 +36,7 @@ export default async function TrackOrderDetailPage({
 
   const order = await prisma.order.findUnique({
     where: { referenceNumber: decodeURIComponent(reference) },
-    include: { items: true },
+    include: { items: true, assignedRider: true },
   });
 
   if (!order) {
@@ -50,7 +50,7 @@ export default async function TrackOrderDetailPage({
     notFound();
   }
 
-  const showPaidView = order.status === "PAID";
+  const showPaidView = order.status === "PAYMENT_CONFIRMED";
 
   if (showPaidView && order.verificationCode) {
     return (
@@ -81,13 +81,15 @@ export default async function TrackOrderDetailPage({
               <p className="font-serif text-3xl">{order.verificationCode}</p>
             </div>
 
-            <div className="rounded-xl bg-mama-gray p-4 text-left">
-              <p className="text-xs uppercase tracking-wider text-mama-muted">
-                Assigned Rider
-              </p>
-              <p className="font-medium">Kwame O.</p>
-              <p className="text-sm text-mama-muted">⭐ 4.9 (2k+ deliveries)</p>
-            </div>
+            {order.assignedRider && (
+              <div className="rounded-xl bg-mama-gray p-4 text-left">
+                <p className="text-xs uppercase tracking-wider text-mama-muted">
+                  Assigned Rider
+                </p>
+                <p className="font-medium">{order.assignedRider.name}</p>
+                <p className="text-sm text-mama-muted">{order.assignedRider.phone}</p>
+              </div>
+            )}
 
             <Button asChild className="w-full">
               <Link href={`/track/${order.referenceNumber}?phone=${order.phoneNumber}`}>
@@ -131,6 +133,23 @@ export default async function TrackOrderDetailPage({
           message={order.adminMessage}
         />
       )}
+
+      {order.assignedRider &&
+        (order.status === "RIDER_ASSIGNED" ||
+          order.status === "OUT_FOR_DELIVERY" ||
+          order.status === "DELIVERED") && (
+          <Card className="mt-6">
+            <CardContent className="pt-4">
+              <p className="text-[10px] uppercase tracking-wider text-mama-muted">
+                Your Rider
+              </p>
+              <p className="mt-1 font-medium text-mama-ink">
+                {order.assignedRider.name}
+              </p>
+              <p className="text-sm text-mama-muted">{order.assignedRider.phone}</p>
+            </CardContent>
+          </Card>
+        )}
 
       <Card className="mt-6">
         <CardContent className="space-y-4 pt-6 text-center">

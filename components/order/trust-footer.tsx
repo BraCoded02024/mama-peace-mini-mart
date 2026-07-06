@@ -39,11 +39,12 @@ const DELIVERY_STAGES = [
 
 function deliveryStageIndex(status?: string) {
   switch (status) {
-    case "PAID":
+    case "PAYMENT_CONFIRMED":
       return 0;
-    case "PREPARING":
+    case "READY_FOR_PICKUP":
+    case "RIDER_ASSIGNED":
       return 1;
-    case "ON_THE_WAY":
+    case "OUT_FOR_DELIVERY":
       return 2;
     case "DELIVERED":
       return 3;
@@ -97,11 +98,11 @@ export function OrderProgressSteps({
   ];
 
   const activeIndex =
-    status === "PAID"
+    status === "PAYMENT_CONFIRMED"
       ? 0
-      : status === "PREPARING"
+      : status === "READY_FOR_PICKUP" || status === "RIDER_ASSIGNED"
         ? 1
-        : status === "ON_THE_WAY"
+        : status === "OUT_FOR_DELIVERY"
           ? 2
           : status === "DELIVERED"
             ? 3

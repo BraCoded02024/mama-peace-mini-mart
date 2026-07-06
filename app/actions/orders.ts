@@ -225,6 +225,31 @@ export async function updateOrderStatusAction(data: {
   });
 
   revalidatePath("/admin");
+  revalidatePath("/riders");
+  return { success: true as const };
+}
+
+export async function markOrderReadyForPickupAction(orderId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) {
+    return { success: false as const, error: "Order not found" };
+  }
+  if (order.status !== "PAYMENT_CONFIRMED") {
+    return {
+      success: false as const,
+      error: "Only payment-confirmed orders can be marked ready for pickup",
+    };
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status: "READY_FOR_PICKUP" },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/riders");
+  revalidatePath(`/track/${order.referenceNumber}`);
   return { success: true as const };
 }
 
@@ -245,7 +270,7 @@ export async function markOrderPaidAction(orderId: string, transactionReference:
     return { success: false as const, error: "Order not found" };
   }
 
-  if (existing.status === "PAID") {
+  if (existing.status === "PAYMENT_CONFIRMED") {
     return {
       success: true as const,
       alreadyPaid: true as const,
@@ -262,7 +287,7 @@ export async function markOrderPaidAction(orderId: string, transactionReference:
   const order = await prisma.order.update({
     where: { id: orderId },
     data: {
-      status: "PAID",
+      status: "PAYMENT_CONFIRMED",
       transactionReference,
       verificationCode,
     },
@@ -289,6 +314,7 @@ export async function markOrderPaidAction(orderId: string, transactionReference:
   );
 
   revalidatePath("/admin");
+  revalidatePath("/riders");
   revalidatePath(`/track/${order.referenceNumber}`);
 
   return { success: true as const, verificationCode };

@@ -10,11 +10,17 @@ datasource db {
 enum OrderStatus {
   PENDING_REVIEW
   AWAITING_PAYMENT
-  PAID
-  PREPARING
-  ON_THE_WAY
+  PAYMENT_CONFIRMED
+  READY_FOR_PICKUP
+  RIDER_ASSIGNED
+  OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+}
+
+enum RiderStatus {
+  ACTIVE
+  INACTIVE
 }
 
 model Order {
@@ -35,6 +41,9 @@ model Order {
   adminMessage         String?
   verificationCode     String?
   transactionReference String?
+  assignedRiderId      String?
+  assignedRider        Rider?      @relation(fields: [assignedRiderId], references: [id], onDelete: SetNull)
+  assignedAt           DateTime?
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
   items                OrderItem[]
@@ -65,4 +74,17 @@ model Admin {
   username     String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+}
+
+model Rider {
+  id              String      @id @default(cuid())
+  name            String
+  phone           String      @unique
+  pinHash         String
+  area            String
+  motorbikeNumber String?
+  status          RiderStatus @default(ACTIVE)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  orders          Order[]
 }

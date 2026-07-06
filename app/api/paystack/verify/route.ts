@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (order.status === "PAID") {
+    if (order.status === "PAYMENT_CONFIRMED") {
       return NextResponse.json({
         success: true,
         alreadyPaid: true,

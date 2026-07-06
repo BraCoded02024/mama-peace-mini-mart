@@ -17,7 +17,7 @@ export default async function AdminOrderPage({
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { items: true },
+    include: { items: true, assignedRider: true },
   });
 
   if (!order) notFound();
