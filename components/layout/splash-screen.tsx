@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-const SPLASH_DURATION_MS = 3000;
+const SPLASH_DURATION_MS = 1000;
+const SPLASH_SEEN_KEY = "mama_peace_splash_seen";
 
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
@@ -13,8 +14,19 @@ function easeOutCubic(t: number) {
 export function SplashScreen() {
   const router = useRouter();
   const [progress, setProgress] = useState(0);
+  const [skipAnimation, setSkipAnimation] = useState(false);
 
   useEffect(() => {
+    try {
+      if (sessionStorage.getItem(SPLASH_SEEN_KEY)) {
+        setSkipAnimation(true);
+        router.replace("/home");
+        return;
+      }
+    } catch {
+      // ignore storage errors
+    }
+
     const start = performance.now();
     let frame = 0;
 
@@ -25,6 +37,11 @@ export function SplashScreen() {
       setProgress(next);
 
       if (ratio >= 1) {
+        try {
+          sessionStorage.setItem(SPLASH_SEEN_KEY, "1");
+        } catch {
+          // ignore
+        }
         router.replace("/home");
         return;
       }
@@ -35,6 +52,10 @@ export function SplashScreen() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [router]);
+
+  if (skipAnimation) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">

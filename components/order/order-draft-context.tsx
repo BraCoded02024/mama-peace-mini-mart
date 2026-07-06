@@ -74,10 +74,6 @@ export function OrderDraftProvider({ children }: { children: ReactNode }) {
     [draft]
   );
 
-  if (!hydrated) {
-    return null;
-  }
-
   return (
     <OrderDraftContext.Provider value={value}>
       {children}
