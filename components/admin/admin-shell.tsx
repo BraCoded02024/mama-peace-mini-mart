@@ -11,10 +11,9 @@ const navItems = [
     match: (p: string) => p === "/admin",
   },
   {
-    href: "/admin",
+    href: "/admin/customers",
     label: "Customers",
-    match: () => false,
-    disabled: true,
+    match: (p: string) => p.startsWith("/admin/customers"),
   },
   {
     href: "/admin",

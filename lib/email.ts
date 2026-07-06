@@ -210,3 +210,28 @@ export function adminPaymentReceivedEmail(params: {
     `,
   };
 }
+
+export function promotionEmail(params: {
+  customerName: string;
+  subject: string;
+  message: string;
+  shopUrl: string;
+}) {
+  const messageHtml = escapeHtml(params.message).replace(/\n/g, "<br />");
+
+  return {
+    subject: params.subject,
+    html: `
+      <p>Hi ${escapeHtml(params.customerName)},</p>
+      <p>${messageHtml}</p>
+      <p style="margin-top:24px;">
+        <a href="${params.shopUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;">
+          Shop Now
+        </a>
+      </p>
+      <p style="margin-top:24px;color:#666;font-size:14px;">
+        Mama Peace Mini Mart · Fresh groceries delivered in Greater Accra
+      </p>
+    `,
+  };
+}
