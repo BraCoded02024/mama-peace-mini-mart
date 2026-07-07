@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { logoutAction } from "@/app/actions/auth";
+import { AdminNotifications } from "@/components/admin/admin-notifications";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -75,6 +76,7 @@ export function AdminShell({
             </div>
 
             <div className="flex items-center gap-3">
+              <AdminNotifications />
               <div className="hidden items-center gap-2 sm:flex">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mama-green text-sm font-semibold text-white">
                   {initial}

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { adminSupportMessageEmail, sendAdminEmail } from "@/lib/email";
+import { appUrl } from "@/lib/app-url";
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +16,18 @@ export async function POST(request: Request) {
         message: String(body.message ?? "").trim(),
       },
     });
+
+    await sendAdminEmail(
+      adminSupportMessageEmail({
+        name: complaint.name,
+        phoneNumber: complaint.phoneNumber,
+        category: complaint.category,
+        message: complaint.message,
+        adminUrl: appUrl("/admin"),
+      })
+    );
+
+    revalidatePath("/admin");
 
     return NextResponse.json({ id: complaint.id, status: complaint.status });
   } catch (error) {

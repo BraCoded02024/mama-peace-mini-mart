@@ -1,31 +1,34 @@
-import Link from "next/link";
 import {
   ClipboardList,
   Clock,
   CreditCard,
   Banknote,
-  ChevronRight,
   MessageSquare,
   Phone,
   Inbox,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { OrderStatusBadge } from "@/components/order/order-status-badge";
+import { AdminOrderRow } from "@/components/admin/admin-order-row";
 import { Card, CardContent } from "@/components/ui/card";
 import { PAID_ORDER_STATUSES } from "@/lib/constants";
+import { toTelHref } from "@/lib/phone";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { Complaint, Order } from "@prisma/client";
+import type { Complaint, Order, Rider } from "@prisma/client";
+
+type OrderWithRider = Order & { assignedRider?: Rider | null };
 
 export function AdminDashboard({
   username,
   pathname,
   orders,
   complaints,
+  riders,
 }: {
   username: string;
   pathname: string;
-  orders: Order[];
+  orders: OrderWithRider[];
   complaints: Complaint[];
+  riders: Rider[];
 }) {
   const pendingCount = orders.filter((o) => o.status === "PENDING_REVIEW").length;
   const awaitingPaymentCount = orders.filter(
@@ -105,38 +108,7 @@ export function AdminDashboard({
           ) : (
             <div className="space-y-3">
               {orders.map((order) => (
-                <Link
-                  key={order.id}
-                  href={`/admin/orders/${order.id}`}
-                  className="group block"
-                >
-                  <Card className="transition hover:border-mama-green/40 hover:shadow-md">
-                    <CardContent className="flex items-center justify-between gap-4 py-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-mama-ink">
-                            {order.referenceNumber}
-                          </p>
-                          <OrderStatusBadge status={order.status} />
-                        </div>
-                        <p className="mt-1 truncate text-sm text-mama-muted">
-                          {order.customerName} · {order.phoneNumber}
-                        </p>
-                        <p className="mt-0.5 text-xs text-mama-muted">
-                          {formatDate(order.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                        {order.totalAmount != null && (
-                          <span className="font-semibold text-mama-ink">
-                            {formatCurrency(order.totalAmount)}
-                          </span>
-                        )}
-                        <ChevronRight className="h-5 w-5 text-mama-muted transition group-hover:translate-x-0.5 group-hover:text-mama-green" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <AdminOrderRow key={order.id} order={order} riders={riders} />
               ))}
             </div>
           )}
@@ -167,10 +139,13 @@ export function AdminDashboard({
                         {c.category}
                       </span>
                     </div>
-                    <p className="mt-1 flex items-center gap-1.5 text-sm text-mama-muted">
+                    <a
+                      href={toTelHref(c.phoneNumber)}
+                      className="mt-1 flex items-center gap-1.5 text-sm text-mama-green hover:underline"
+                    >
                       <Phone className="h-3.5 w-3.5" />
                       {c.phoneNumber}
-                    </p>
+                    </a>
                     <p className="mt-2 text-sm text-mama-ink">{c.message}</p>
                     <p className="mt-2 text-xs text-mama-muted">
                       {formatDate(c.createdAt)}

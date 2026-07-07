@@ -10,14 +10,18 @@ export default async function AdminPage() {
     return <AdminLoginForm />;
   }
 
-  const [orders, complaints] = await Promise.all([
+  const [orders, complaints, riders] = await Promise.all([
     prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
+      include: { assignedRider: true },
     }),
     prisma.complaint.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
+    }),
+    prisma.rider.findMany({
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -27,6 +31,7 @@ export default async function AdminPage() {
       pathname="/admin"
       orders={orders}
       complaints={complaints}
+      riders={riders}
     />
   );
 }

@@ -7,7 +7,8 @@ import { getAdminSession } from "@/lib/auth";
 import { getRiderSession } from "@/lib/rider-auth";
 import { isValidPin } from "@/lib/pin";
 import { sanitizePhoneInput, isValidPhoneNumber } from "@/lib/phone";
-import type { RiderStatus } from "@prisma/client";
+import { notifyAdminActivity } from "@/lib/email";
+import type { OrderStatus, RiderStatus } from "@prisma/client";
 
 async function requireAdmin() {
   const session = await getAdminSession();
@@ -144,6 +145,116 @@ export async function resetRiderPinAction(riderId: string, pin: string) {
   return { success: true as const };
 }
 
+const TERMINAL_ORDER_STATUSES: OrderStatus[] = ["DELIVERED", "CANCELLED"];
+
+export async function assignRiderToOrderAction(data: {
+  orderId: string;
+  riderId: string;
+}) {
+  const auth = await requireAdmin();
+  if (!auth.authorized) return { success: false as const, error: auth.error };
+
+  const [order, rider] = await Promise.all([
+    prisma.order.findUnique({ where: { id: data.orderId } }),
+    prisma.rider.findUnique({ where: { id: data.riderId } }),
+  ]);
+
+  if (!order) return { success: false as const, error: "Order not found" };
+  if (!rider) return { success: false as const, error: "Rider not found" };
+  if (rider.status !== "ACTIVE") {
+    return { success: false as const, error: "Rider is not active" };
+  }
+  if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
+    return {
+      success: false as const,
+      error: "Cannot assign a rider to a completed or cancelled order",
+    };
+  }
+
+  const statusUpdate =
+    order.status === "READY_FOR_PICKUP"
+      ? { status: "RIDER_ASSIGNED" as const }
+      : {};
+
+  const updated = await prisma.order.update({
+    where: { id: data.orderId },
+    data: {
+      assignedRiderId: data.riderId,
+      assignedAt: new Date(),
+      ...statusUpdate,
+    },
+  });
+
+  await notifyAdminActivity({
+    event: "rider_assigned",
+    referenceNumber: updated.referenceNumber,
+    orderId: updated.id,
+    details: {
+      Customer: updated.customerName,
+      Rider: rider.name,
+      "Rider phone": rider.phone,
+      Status: updated.status.replaceAll("_", " "),
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/orders/${data.orderId}`);
+  revalidatePath("/riders");
+  revalidatePath(`/track/${updated.referenceNumber}`);
+  return { success: true as const };
+}
+
+export async function unassignRiderAction(orderId: string) {
+  const auth = await requireAdmin();
+  if (!auth.authorized) return { success: false as const, error: auth.error };
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { assignedRider: true },
+  });
+  if (!order) return { success: false as const, error: "Order not found" };
+  if (!order.assignedRiderId) {
+    return { success: false as const, error: "No rider is assigned" };
+  }
+  if (order.status === "OUT_FOR_DELIVERY") {
+    return {
+      success: false as const,
+      error: "Cannot unassign while order is out for delivery",
+    };
+  }
+
+  const statusUpdate =
+    order.status === "RIDER_ASSIGNED"
+      ? { status: "READY_FOR_PICKUP" as const }
+      : {};
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      assignedRiderId: null,
+      assignedAt: null,
+      ...statusUpdate,
+    },
+  });
+
+  await notifyAdminActivity({
+    event: "rider_unassigned",
+    referenceNumber: updated.referenceNumber,
+    orderId: updated.id,
+    details: {
+      Customer: updated.customerName,
+      "Previous rider": order.assignedRider?.name ?? "Unknown",
+      Status: updated.status.replaceAll("_", " "),
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/riders");
+  revalidatePath(`/track/${updated.referenceNumber}`);
+  return { success: true as const };
+}
+
 export async function acceptOrderAction(orderId: string) {
   const auth = await requireRider();
   if (!auth.authorized) return { success: false as const, error: auth.error };
@@ -153,16 +264,30 @@ export async function acceptOrderAction(orderId: string) {
     if (!order || order.status !== "READY_FOR_PICKUP") {
       return {
         success: false as const,
-        error: "This order has already been assigned.",
+        error: "This order is no longer available.",
+      };
+    }
+
+    if (order.assignedRiderId && order.assignedRiderId !== auth.session.id) {
+      return {
+        success: false as const,
+        error: "This order is assigned to another rider.",
       };
     }
 
     const updated = await tx.order.updateMany({
-      where: { id: orderId, status: "READY_FOR_PICKUP" },
+      where: {
+        id: orderId,
+        status: "READY_FOR_PICKUP",
+        OR: [
+          { assignedRiderId: null },
+          { assignedRiderId: auth.session.id },
+        ],
+      },
       data: {
         status: "RIDER_ASSIGNED",
         assignedRiderId: auth.session.id,
-        assignedAt: new Date(),
+        assignedAt: order.assignedAt ?? new Date(),
       },
     });
 
@@ -173,8 +298,25 @@ export async function acceptOrderAction(orderId: string) {
       };
     }
 
-    return { success: true as const };
+    return { success: true as const, referenceNumber: order.referenceNumber };
   });
+
+  if (result.success) {
+    const rider = await prisma.rider.findUnique({
+      where: { id: auth.session.id },
+      select: { name: true, phone: true },
+    });
+    await notifyAdminActivity({
+      event: "rider_assigned",
+      referenceNumber: result.referenceNumber,
+      orderId,
+      details: {
+        Rider: rider?.name ?? "Unknown",
+        "Rider phone": rider?.phone ?? "",
+        Source: "Rider self-accepted",
+      },
+    });
+  }
 
   revalidatePath("/riders");
   revalidatePath("/admin");
@@ -204,6 +346,23 @@ export async function riderUpdateOrderStatusAction(
   await prisma.order.update({
     where: { id: orderId },
     data: { status },
+  });
+
+  const event = status === "OUT_FOR_DELIVERY" ? "out_for_delivery" : "delivered";
+  const rider = await prisma.rider.findUnique({
+    where: { id: auth.session.id },
+    select: { name: true },
+  });
+
+  await notifyAdminActivity({
+    event,
+    referenceNumber: order.referenceNumber,
+    orderId: order.id,
+    details: {
+      Customer: order.customerName,
+      Rider: rider?.name ?? "Unknown",
+      Status: status.replaceAll("_", " "),
+    },
   });
 
   revalidatePath("/riders");

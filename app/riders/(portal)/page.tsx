@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { getRiderSession } from "@/lib/rider-auth";
 import { riderLogoutAction } from "@/app/actions/rider-auth";
 import { AvailableOrdersList } from "@/components/rider/available-orders-list";
+import { AssignedOrdersList } from "@/components/rider/assigned-orders-list";
 import { CurrentDeliveryCard } from "@/components/rider/current-delivery-card";
+import { RiderLiveBanner } from "@/components/rider/rider-live-banner";
 import { RiderPortalError } from "@/components/rider/rider-portal-error";
 import { Badge } from "@/components/ui/badge";
 
@@ -13,13 +15,31 @@ export default async function RiderPortalPage() {
   const session = await getRiderSession();
   if (!session) redirect("/riders/login");
 
+  let assignedOrders;
   let availableOrders;
   let currentDelivery;
 
   try {
-    [availableOrders, currentDelivery] = await Promise.all([
+    [assignedOrders, availableOrders, currentDelivery] = await Promise.all([
       prisma.order.findMany({
-        where: { status: "READY_FOR_PICKUP" },
+        where: {
+          assignedRiderId: session.id,
+          status: {
+            in: [
+              "PENDING_REVIEW",
+              "AWAITING_PAYMENT",
+              "PAYMENT_CONFIRMED",
+              "READY_FOR_PICKUP",
+            ],
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.order.findMany({
+        where: {
+          status: "READY_FOR_PICKUP",
+          assignedRiderId: null,
+        },
         orderBy: { updatedAt: "desc" },
       }),
       prisma.order.findFirst({
@@ -68,6 +88,8 @@ export default async function RiderPortalPage() {
       </header>
 
       <main className="mx-auto max-w-lg space-y-6 px-4 py-6">
+        <RiderLiveBanner />
+
         <section className="rounded-2xl border border-mama-border bg-white p-5 shadow-sm">
           <p className="font-serif text-2xl text-mama-ink">
             Welcome, {session.name}
@@ -85,10 +107,23 @@ export default async function RiderPortalPage() {
             <CurrentDeliveryCard order={currentDelivery} />
           </section>
         ) : (
-          <section className="space-y-3">
-            <h2 className="font-serif text-xl text-mama-ink">Available Orders</h2>
-            <AvailableOrdersList orders={availableOrders} />
-          </section>
+          <>
+            {assignedOrders.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="font-serif text-xl text-mama-ink">
+                  My Assigned Orders
+                </h2>
+                <AssignedOrdersList orders={assignedOrders} canAccept />
+              </section>
+            )}
+
+            <section className="space-y-3">
+              <h2 className="font-serif text-xl text-mama-ink">
+                Available Orders
+              </h2>
+              <AvailableOrdersList orders={availableOrders} />
+            </section>
+          </>
         )}
       </main>
     </div>

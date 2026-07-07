@@ -9,9 +9,16 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ORDER_STATUS_LABELS } from "@/lib/constants";
 import type { Order } from "@prisma/client";
 
-export function AvailableOrdersList({ orders }: { orders: Order[] }) {
+export function AssignedOrdersList({
+  orders,
+  canAccept,
+}: {
+  orders: Order[];
+  canAccept: boolean;
+}) {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -29,18 +36,7 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
     router.refresh();
   }
 
-  if (orders.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center">
-          <p className="font-medium text-mama-ink">No orders available</p>
-          <p className="mt-1 text-sm text-mama-muted">
-            New pickups will appear here when the admin marks them ready.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  if (orders.length === 0) return null;
 
   return (
     <div className="space-y-3">
@@ -69,20 +65,15 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
                   {order.phoneNumber}
                 </a>
               </div>
-              <Badge variant="success">Paid</Badge>
+              <Badge variant="muted">
+                {ORDER_STATUS_LABELS[order.status] ?? order.status}
+              </Badge>
             </div>
 
             <div className="flex items-start gap-2 text-sm text-mama-ink">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mama-green" />
               <span>{order.gpsAddress}</span>
             </div>
-
-            {order.specialInstructions && (
-              <p className="rounded-xl bg-mama-gray px-3 py-2 text-sm text-mama-muted">
-                <span className="font-medium text-mama-ink">Note: </span>
-                {order.specialInstructions}
-              </p>
-            )}
 
             {order.totalAmount != null && (
               <p className="text-sm">
@@ -93,16 +84,24 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
               </p>
             )}
 
-            <Button
-              className="w-full"
-              disabled={loadingId === order.id}
-              onClick={() => handleAccept(order.id)}
-            >
-              {loadingId === order.id && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
-              Accept
-            </Button>
+            {canAccept && order.status === "READY_FOR_PICKUP" && (
+              <Button
+                className="w-full"
+                disabled={loadingId === order.id}
+                onClick={() => handleAccept(order.id)}
+              >
+                {loadingId === order.id && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Start Delivery
+              </Button>
+            )}
+
+            {!canAccept && order.status !== "READY_FOR_PICKUP" && (
+              <p className="text-sm text-mama-muted">
+                Waiting for admin to mark this order ready for pickup.
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}

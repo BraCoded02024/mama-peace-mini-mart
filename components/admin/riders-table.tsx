@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Pencil, KeyRound, Loader2 } from "lucide-react";
 import { setRiderStatusAction, resetRiderPinAction } from "@/app/actions/riders";
 import { RIDER_STATUS_LABELS } from "@/lib/constants";
+import { toTelHref } from "@/lib/phone";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,7 +98,14 @@ export function RidersTable({ riders }: { riders: Rider[] }) {
                     <td className="px-4 py-3 font-medium text-mama-ink">
                       {rider.name}
                     </td>
-                    <td className="px-4 py-3 text-mama-muted">{rider.phone}</td>
+                    <td className="px-4 py-3">
+                      <a
+                        href={toTelHref(rider.phone)}
+                        className="text-mama-green hover:underline"
+                      >
+                        {rider.phone}
+                      </a>
+                    </td>
                     <td className="px-4 py-3 text-mama-muted">{rider.area}</td>
                     <td className="px-4 py-3 text-mama-muted">
                       {rider.motorbikeNumber ?? "—"}

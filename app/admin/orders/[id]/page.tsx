@@ -15,10 +15,16 @@ export default async function AdminOrderPage({
   if (!session) redirect("/admin");
 
   const { id } = await params;
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: { items: true, assignedRider: true },
-  });
+  const [order, riders] = await Promise.all([
+    prisma.order.findUnique({
+      where: { id },
+      include: { items: true, assignedRider: true },
+    }),
+    prisma.rider.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   if (!order) notFound();
 
@@ -48,7 +54,7 @@ export default async function AdminOrderPage({
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
-        <AdminOrderPanel order={order} />
+        <AdminOrderPanel order={order} riders={riders} />
       </main>
     </div>
   );

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { generateReferenceNumber, generateVerificationCode } from "@/lib/reference";
+import { appUrl } from "@/lib/app-url";
 import {
   orderSubmittedEmail,
   orderAwaitingPaymentEmail,
@@ -11,17 +12,13 @@ import {
   adminNewOrderEmail,
   adminSupportMessageEmail,
   adminPaymentReceivedEmail,
+  notifyAdminActivity,
   sendEmail,
   sendAdminEmail,
 } from "@/lib/email";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
 import { initializePaystackPayment } from "@/lib/paystack";
 import type { OrderStatus } from "@prisma/client";
-
-function appUrl(path: string) {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}${path}`;
-}
 
 function normalizeCustomerEmail(email?: string | null) {
   const trimmed = email?.trim().toLowerCase();
@@ -167,6 +164,17 @@ export async function approveOrderAction(data: {
 
   await sendCustomerEmail(order.customerEmail, emailContent);
 
+  await notifyAdminActivity({
+    event: "order_approved",
+    referenceNumber: order.referenceNumber,
+    orderId: order.id,
+    details: {
+      Customer: order.customerName,
+      Phone: order.phoneNumber,
+      Total: `GHS ${totalAmount.toFixed(2)}`,
+    },
+  });
+
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
 
@@ -206,6 +214,17 @@ export async function sendOrderMessageAction(data: {
 
   const emailResult = await sendCustomerEmail(order.customerEmail, emailContent);
 
+  await notifyAdminActivity({
+    event: "admin_message_sent",
+    referenceNumber: order.referenceNumber,
+    orderId: order.id,
+    details: {
+      Customer: order.customerName,
+      Message: message.slice(0, 200),
+      Emailed: "skipped" in emailResult && emailResult.skipped ? "No" : "Yes",
+    },
+  });
+
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
 
@@ -219,10 +238,32 @@ export async function updateOrderStatusAction(data: {
   orderId: string;
   status: OrderStatus;
 }) {
-  await prisma.order.update({
+  const order = await prisma.order.update({
     where: { id: data.orderId },
     data: { status: data.status },
+    include: { assignedRider: true },
   });
+
+  const statusEvents: Partial<Record<OrderStatus, "out_for_delivery" | "delivered" | "order_cancelled">> = {
+    OUT_FOR_DELIVERY: "out_for_delivery",
+    DELIVERED: "delivered",
+    CANCELLED: "order_cancelled",
+  };
+  const event = statusEvents[data.status];
+  if (event) {
+    await notifyAdminActivity({
+      event,
+      referenceNumber: order.referenceNumber,
+      orderId: order.id,
+      details: {
+        Customer: order.customerName,
+        Status: data.status.replaceAll("_", " "),
+        ...(order.assignedRider
+          ? { Rider: order.assignedRider.name }
+          : {}),
+      },
+    });
+  }
 
   revalidatePath("/admin");
   revalidatePath("/riders");
@@ -246,6 +287,16 @@ export async function markOrderReadyForPickupAction(orderId: string) {
     data: { status: "READY_FOR_PICKUP" },
   });
 
+  await notifyAdminActivity({
+    event: "order_ready_for_pickup",
+    referenceNumber: order.referenceNumber,
+    orderId: order.id,
+    details: {
+      Customer: order.customerName,
+      Phone: order.phoneNumber,
+    },
+  });
+
   revalidatePath("/admin");
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/riders");
@@ -254,9 +305,19 @@ export async function markOrderReadyForPickupAction(orderId: string) {
 }
 
 export async function cancelOrderAction(orderId: string) {
-  await prisma.order.update({
+  const order = await prisma.order.update({
     where: { id: orderId },
     data: { status: "CANCELLED" },
+  });
+
+  await notifyAdminActivity({
+    event: "order_cancelled",
+    referenceNumber: order.referenceNumber,
+    orderId: order.id,
+    details: {
+      Customer: order.customerName,
+      Phone: order.phoneNumber,
+    },
   });
 
   revalidatePath("/admin");

@@ -211,6 +211,75 @@ export function adminPaymentReceivedEmail(params: {
   };
 }
 
+export type AdminActivityEvent =
+  | "order_approved"
+  | "order_ready_for_pickup"
+  | "rider_assigned"
+  | "rider_unassigned"
+  | "out_for_delivery"
+  | "delivered"
+  | "order_cancelled"
+  | "admin_message_sent";
+
+const ACTIVITY_EVENT_LABELS: Record<AdminActivityEvent, string> = {
+  order_approved: "Order approved — awaiting payment",
+  order_ready_for_pickup: "Order ready for pickup",
+  rider_assigned: "Rider assigned to order",
+  rider_unassigned: "Rider unassigned from order",
+  out_for_delivery: "Order out for delivery",
+  delivered: "Order delivered",
+  order_cancelled: "Order cancelled",
+  admin_message_sent: "Message sent to customer",
+};
+
+export function adminActivityEmail(params: {
+  event: AdminActivityEvent;
+  referenceNumber?: string;
+  details: Record<string, string>;
+  adminUrl: string;
+}) {
+  const label = ACTIVITY_EVENT_LABELS[params.event];
+  const ref = params.referenceNumber
+    ? ` — ${escapeHtml(params.referenceNumber)}`
+    : "";
+  const detailRows = Object.entries(params.details)
+    .map(
+      ([key, value]) =>
+        `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(value)}`
+    )
+    .join("<br />");
+
+  return {
+    subject: `${label}${params.referenceNumber ? ` (${params.referenceNumber})` : ""}`,
+    html: `
+      <p><strong>${escapeHtml(label)}${ref}</strong></p>
+      <p>${detailRows}</p>
+      <p><a href="${params.adminUrl}">Open in admin dashboard</a></p>
+      <p>— Mama Peace Mini Mart</p>
+    `,
+  };
+}
+
+export async function notifyAdminActivity(params: {
+  event: AdminActivityEvent;
+  referenceNumber?: string;
+  orderId?: string;
+  details: Record<string, string>;
+}) {
+  const adminUrl = params.orderId
+    ? `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin/orders/${params.orderId}`
+    : `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/admin`;
+
+  return sendAdminEmail(
+    adminActivityEmail({
+      event: params.event,
+      referenceNumber: params.referenceNumber,
+      details: params.details,
+      adminUrl,
+    })
+  );
+}
+
 export function promotionEmail(params: {
   customerName: string;
   subject: string;

@@ -12,12 +12,19 @@ import {
   Tag,
   KeyRound,
   Loader2,
+  PhoneCall,
+  AlertTriangle,
 } from "lucide-react";
 import {
   approveOrderAction,
   markOrderReadyForPickupAction,
 } from "@/app/actions/orders";
-import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
+import {
+  assignRiderToOrderAction,
+  unassignRiderAction,
+} from "@/app/actions/riders";
+import { MIN_ORDER_AMOUNT_GHS, STALE_ASSIGNMENT_MINUTES } from "@/lib/constants";
+import { toTelHref } from "@/lib/phone";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +41,13 @@ type OrderWithItems = Order & {
   assignedRider?: Rider | null;
 };
 
-export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
+export function AdminOrderPanel({
+  order,
+  riders,
+}: {
+  order: OrderWithItems;
+  riders: Rider[];
+}) {
   const router = useRouter();
   const [subtotal, setSubtotal] = useState(order.subtotal?.toString() ?? "");
   const [deliveryFee, setDeliveryFee] = useState(
@@ -46,6 +59,26 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
   const [adminMessage, setAdminMessage] = useState(order.adminMessage ?? "");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedRiderId, setSelectedRiderId] = useState(
+    order.assignedRiderId ?? ""
+  );
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  const activeRiders = riders.filter((r) => r.status === "ACTIVE");
+  const canAssignRider = !["DELIVERED", "CANCELLED"].includes(order.status);
+  const showAssignCard = canAssignRider;
+
+  const staleAssignment =
+    order.status === "RIDER_ASSIGNED" &&
+    order.assignedAt &&
+    Date.now() - new Date(order.assignedAt).getTime() >
+      STALE_ASSIGNMENT_MINUTES * 60 * 1000;
+
+  const staleMinutes = order.assignedAt
+    ? Math.floor(
+        (Date.now() - new Date(order.assignedAt).getTime()) / 60_000
+      )
+    : 0;
 
   const total =
     (parseFloat(subtotal) || 0) +
@@ -82,6 +115,35 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
     router.refresh();
   }
 
+  async function handleAssignRider() {
+    if (!selectedRiderId) return;
+    setAssignLoading(true);
+    setError("");
+    const result = await assignRiderToOrderAction({
+      orderId: order.id,
+      riderId: selectedRiderId,
+    });
+    setAssignLoading(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  async function handleUnassignRider() {
+    setAssignLoading(true);
+    setError("");
+    const result = await unassignRiderAction(order.id);
+    setAssignLoading(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setSelectedRiderId("");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-5">
       <Card className="overflow-hidden">
@@ -101,7 +163,22 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
         <CardContent className="space-y-4 pt-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <InfoRow icon={User} label="Customer" value={order.customerName} />
-            <InfoRow icon={Phone} label="Phone" value={order.phoneNumber} />
+            <div className="flex items-start gap-3 rounded-xl border border-mama-border bg-white p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mama-green/10 text-mama-green">
+                <Phone className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-mama-muted">
+                  Phone
+                </p>
+                <a
+                  href={toTelHref(order.phoneNumber)}
+                  className="break-words text-sm font-medium text-mama-green hover:underline"
+                >
+                  {order.phoneNumber}
+                </a>
+              </div>
+            </div>
             {order.customerEmail && (
               <InfoRow icon={Mail} label="Email" value={order.customerEmail} />
             )}
@@ -272,35 +349,116 @@ export function AdminOrderPanel({ order }: { order: OrderWithItems }) {
         </Card>
       )}
 
-      {order.status === "READY_FOR_PICKUP" && (
+      {showAssignCard && (
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            <div>
+              <h3 className="font-serif text-lg text-mama-ink">Assign Rider</h3>
+              <p className="text-sm text-mama-muted">
+                Pre-assign a rider when the order is placed, or assign when ready
+                for pickup. Call the rider if they do not respond.
+              </p>
+            </div>
+
+            {order.assignedRider ? (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-mama-border bg-mama-gray p-4 text-sm">
+                  <p className="font-medium text-mama-ink">
+                    {order.assignedRider.name}
+                  </p>
+                  <p className="text-mama-muted">{order.assignedRider.area}</p>
+                  {order.assignedAt && (
+                    <p className="mt-1 text-xs text-mama-muted">
+                      Assigned {formatDate(order.assignedAt)}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={toTelHref(order.assignedRider.phone)}
+                    className="inline-flex items-center gap-2 rounded-full bg-mama-green px-4 py-2 text-sm font-semibold text-white transition hover:bg-mama-green-light"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                    Call Rider
+                  </a>
+                  {order.status !== "OUT_FOR_DELIVERY" && (
+                    <Button
+                      variant="outline"
+                      disabled={assignLoading}
+                      onClick={handleUnassignRider}
+                    >
+                      Unassign
+                    </Button>
+                  )}
+                </div>
+                {staleAssignment && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Assigned {staleMinutes} min ago — rider has not picked up
+                      yet. Consider calling them.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <select
+                  value={selectedRiderId}
+                  onChange={(e) => setSelectedRiderId(e.target.value)}
+                  className="w-full rounded-xl border border-mama-border bg-white px-3 py-2.5 text-sm text-mama-ink"
+                >
+                  <option value="">Select a rider…</option>
+                  {activeRiders.map((rider) => (
+                    <option key={rider.id} value={rider.id}>
+                      {rider.name} — {rider.area} ({rider.phone})
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={handleAssignRider}
+                  disabled={!selectedRiderId || assignLoading}
+                  className="w-full"
+                >
+                  {assignLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Assign Rider
+                </Button>
+              </div>
+            )}
+
+            {order.status === "READY_FOR_PICKUP" && !order.assignedRiderId && (
+              <p className="text-sm text-mama-muted">
+                This order is visible to all active riders until you assign one.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {order.status === "READY_FOR_PICKUP" && order.assignedRiderId && (
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-mama-muted">
-              This order is visible to active riders and waiting for acceptance.
+              Assigned to {order.assignedRider?.name}. Rider can start delivery
+              from their portal, or you can call them.
             </p>
           </CardContent>
         </Card>
       )}
 
       {(order.status === "RIDER_ASSIGNED" ||
-        order.status === "OUT_FOR_DELIVERY") && (
+        order.status === "OUT_FOR_DELIVERY") &&
+        order.assignedRider && (
         <Card>
           <CardContent className="space-y-3 pt-6">
-            <h3 className="font-serif text-lg text-mama-ink">Rider Assignment</h3>
-            {order.assignedRider ? (
-              <div className="rounded-xl border border-mama-border bg-mama-gray p-4 text-sm">
-                <p className="font-medium text-mama-ink">{order.assignedRider.name}</p>
-                <p className="text-mama-muted">{order.assignedRider.phone}</p>
-                <p className="text-mama-muted">{order.assignedRider.area}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-mama-muted">Rider details unavailable.</p>
-            )}
-            {order.assignedAt && (
-              <p className="text-xs text-mama-muted">
-                Assigned {formatDate(order.assignedAt)}
-              </p>
-            )}
+            <h3 className="font-serif text-lg text-mama-ink">Delivery in Progress</h3>
+            <a
+              href={toTelHref(order.assignedRider.phone)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-mama-green px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-mama-green-light"
+            >
+              <PhoneCall className="h-4 w-4" />
+              Call Rider
+            </a>
           </CardContent>
         </Card>
       )}

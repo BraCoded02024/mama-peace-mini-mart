@@ -23,3 +23,6 @@ export const PAID_ORDER_STATUSES = [
   "OUT_FOR_DELIVERY",
   "DELIVERED",
 ] as const;
+
+/** Minutes before admin sees a "call rider" warning on RIDER_ASSIGNED orders. */
+export const STALE_ASSIGNMENT_MINUTES = 10;

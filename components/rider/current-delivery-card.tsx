@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { riderUpdateOrderStatusAction } from "@/app/actions/riders";
 import { resolveOrderMapsUrl, stripMapPinNote } from "@/lib/location";
+import { toTelHref } from "@/lib/phone";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,10 +74,13 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
             <User className="h-4 w-4 text-mama-green" />
             {order.customerName}
           </p>
-          <p className="flex items-center gap-2 text-mama-muted">
+          <a
+            href={toTelHref(order.phoneNumber)}
+            className="flex items-center gap-2 text-mama-green hover:underline"
+          >
             <Phone className="h-4 w-4" />
             {order.phoneNumber}
-          </p>
+          </a>
           <p className="flex items-start gap-2 text-mama-ink">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mama-green" />
             <span>{order.gpsAddress}</span>
