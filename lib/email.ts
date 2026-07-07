@@ -4,7 +4,30 @@ type EmailPayload = {
   to: string | string[];
   subject: string;
   html: string;
+  bcc?: string | string[];
 };
+
+function stripEnvValue(value?: string | null) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+export function getAdminRecipients() {
+  const raw = stripEnvValue(process.env.ADMIN_EMAIL);
+  if (!raw) return [];
+
+  return raw
+    .split(",")
+    .map((email) => stripEnvValue(email))
+    .filter(Boolean);
+}
 
 function truncateText(text: string, maxLength = 280) {
   const trimmed = text.trim();
@@ -20,9 +43,11 @@ function escapeHtml(text: string) {
     .replace(/"/g, "&quot;");
 }
 
-export async function sendEmail({ to, subject, html }: EmailPayload) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim() ?? "Mama Peace <orders@mamapeacemart.com>";
+export async function sendEmail({ to, subject, html, bcc }: EmailPayload) {
+  const apiKey = stripEnvValue(process.env.RESEND_API_KEY);
+  const from =
+    stripEnvValue(process.env.EMAIL_FROM) ||
+    "Mama Peace <orders@mamapeacemart.com>";
 
   if (!apiKey) {
     console.warn(
@@ -39,7 +64,13 @@ export async function sendEmail({ to, subject, html }: EmailPayload) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from, to, subject, html }),
+    body: JSON.stringify({
+      from,
+      to,
+      subject,
+      html,
+      ...(bcc ? { bcc } : {}),
+    }),
   });
 
   const body = await response.text();
@@ -62,8 +93,8 @@ export async function sendEmail({ to, subject, html }: EmailPayload) {
 }
 
 export async function sendAdminEmail(content: { subject: string; html: string }) {
-  const raw = process.env.ADMIN_EMAIL?.trim();
-  if (!raw) {
+  const recipients = getAdminRecipients();
+  if (recipients.length === 0) {
     console.warn(
       "[admin-email] ADMIN_EMAIL is not set — admin notification was NOT sent.",
       { subject: content.subject }
@@ -72,17 +103,10 @@ export async function sendAdminEmail(content: { subject: string; html: string })
     return { success: true as const, skipped: true as const };
   }
 
-  const recipients = raw
-    .split(",")
-    .map((email) => email.trim())
-    .filter(Boolean);
-
-  if (recipients.length === 0) {
-    console.warn("[admin-email] ADMIN_EMAIL has no valid addresses.");
-    return { success: true as const, skipped: true as const };
-  }
-
-  return sendEmail({ to: recipients.length === 1 ? recipients[0] : recipients, ...content });
+  return sendEmail({
+    to: recipients.length === 1 ? recipients[0] : recipients,
+    ...content,
+  });
 }
 
 /** Email the store admin immediately when a customer places a new order. */

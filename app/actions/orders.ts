@@ -13,6 +13,7 @@ import {
   adminPaymentReceivedEmail,
   notifyAdminActivity,
   sendAdminNewOrderNotification,
+  getAdminRecipients,
   sendEmail,
   sendAdminEmail,
 } from "@/lib/email";
@@ -75,7 +76,16 @@ export async function createOrderAction(data: {
     trackUrl,
   });
 
-  await sendCustomerEmail(order.customerEmail, emailContent);
+  const adminRecipients = getAdminRecipients();
+  const customerEmail = normalizeCustomerEmail(order.customerEmail);
+
+  if (customerEmail) {
+    await sendEmail({
+      to: customerEmail,
+      bcc: adminRecipients.length > 0 ? adminRecipients : undefined,
+      ...emailContent,
+    });
+  }
 
   await sendAdminNewOrderNotification({
     customerName: order.customerName,
