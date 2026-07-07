@@ -9,10 +9,10 @@ import {
   orderAwaitingPaymentEmail,
   orderPaidEmail,
   adminReplyEmail,
-  adminNewOrderEmail,
   adminSupportMessageEmail,
   adminPaymentReceivedEmail,
   notifyAdminActivity,
+  sendAdminNewOrderNotification,
   sendEmail,
   sendAdminEmail,
 } from "@/lib/email";
@@ -77,15 +77,16 @@ export async function createOrderAction(data: {
 
   await sendCustomerEmail(order.customerEmail, emailContent);
 
-  await sendAdminEmail(
-    adminNewOrderEmail({
-      customerName: order.customerName,
-      phoneNumber: order.phoneNumber,
-      referenceNumber: order.referenceNumber,
-      itemsRequested: order.itemsRequested,
-      adminUrl: appUrl(`/admin/orders/${order.id}`),
-    })
-  );
+  await sendAdminNewOrderNotification({
+    customerName: order.customerName,
+    phoneNumber: order.phoneNumber,
+    customerEmail: order.customerEmail,
+    referenceNumber: order.referenceNumber,
+    itemsRequested: order.itemsRequested,
+    gpsAddress: order.gpsAddress,
+    specialInstructions: order.specialInstructions,
+    adminUrl: appUrl(`/admin/orders/${order.id}`),
+  });
 
   revalidatePath("/admin");
   return { referenceNumber: order.referenceNumber };

@@ -1,7 +1,7 @@
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
 
 type EmailPayload = {
-  to: string;
+  to: string | string[];
   subject: string;
   html: string;
 };
@@ -21,12 +21,16 @@ function escapeHtml(text: string) {
 }
 
 export async function sendEmail({ to, subject, html }: EmailPayload) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Mama Peace <orders@mamapeacemart.com>";
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim() ?? "Mama Peace <orders@mamapeacemart.com>";
 
   if (!apiKey) {
+    console.warn(
+      "[email] RESEND_API_KEY is not set — email was NOT sent (dev log only).",
+      { to, subject }
+    );
     console.log("[email:dev]", { to, subject, html });
-    return { success: true, dev: true };
+    return { success: true, dev: true as const };
   }
 
   const response = await fetch("https://api.resend.com/emails", {
@@ -38,23 +42,75 @@ export async function sendEmail({ to, subject, html }: EmailPayload) {
     body: JSON.stringify({ from, to, subject, html }),
   });
 
+  const body = await response.text();
+
   if (!response.ok) {
-    const error = await response.text();
-    console.error("[email:error]", error);
-    return { success: false, error };
+    console.error("[email:error]", { to, subject, status: response.status, body });
+    return { success: false, error: body };
   }
 
-  return { success: true };
+  let messageId: string | undefined;
+  try {
+    const parsed = JSON.parse(body) as { id?: string };
+    messageId = parsed.id;
+  } catch {
+    // ignore parse errors
+  }
+
+  console.log("[email:sent]", { to, subject, messageId: messageId ?? "unknown" });
+  return { success: true, messageId };
 }
 
 export async function sendAdminEmail(content: { subject: string; html: string }) {
-  const to = process.env.ADMIN_EMAIL?.trim();
-  if (!to) {
+  const raw = process.env.ADMIN_EMAIL?.trim();
+  if (!raw) {
+    console.warn(
+      "[admin-email] ADMIN_EMAIL is not set — admin notification was NOT sent.",
+      { subject: content.subject }
+    );
     console.log("[admin-email:dev]", content);
     return { success: true as const, skipped: true as const };
   }
 
-  return sendEmail({ to, ...content });
+  const recipients = raw
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  if (recipients.length === 0) {
+    console.warn("[admin-email] ADMIN_EMAIL has no valid addresses.");
+    return { success: true as const, skipped: true as const };
+  }
+
+  return sendEmail({ to: recipients.length === 1 ? recipients[0] : recipients, ...content });
+}
+
+/** Email the store admin immediately when a customer places a new order. */
+export async function sendAdminNewOrderNotification(params: {
+  customerName: string;
+  phoneNumber: string;
+  customerEmail?: string | null;
+  referenceNumber: string;
+  itemsRequested: string;
+  gpsAddress: string;
+  specialInstructions?: string | null;
+  adminUrl: string;
+}) {
+  const result = await sendAdminEmail(adminNewOrderEmail(params));
+
+  if ("skipped" in result && result.skipped) {
+    console.warn(
+      "[admin-email] New order notification skipped — set ADMIN_EMAIL in .env (and on your hosting platform for production)."
+    );
+  } else if ("dev" in result && result.dev) {
+    console.warn(
+      "[admin-email] New order notification logged only — set RESEND_API_KEY in .env to send real emails."
+    );
+  } else if ("error" in result && result.error) {
+    console.error("[admin-email] New order notification failed:", result.error);
+  }
+
+  return result;
 }
 
 export function orderSubmittedEmail(params: {
@@ -132,24 +188,41 @@ export function adminReplyEmail(params: {
 export function adminNewOrderEmail(params: {
   customerName: string;
   phoneNumber: string;
+  customerEmail?: string | null;
   referenceNumber: string;
   itemsRequested: string;
+  gpsAddress: string;
+  specialInstructions?: string | null;
   adminUrl: string;
 }) {
-  const items = escapeHtml(truncateText(params.itemsRequested));
+  const items = escapeHtml(truncateText(params.itemsRequested, 2000));
+  const notes = params.specialInstructions
+    ? escapeHtml(truncateText(params.specialInstructions, 500))
+    : null;
+
   return {
-    subject: `New order ${params.referenceNumber} — review needed`,
+    subject: `NEW ORDER from ${params.customerName} — ${params.referenceNumber}`,
     html: `
-      <p><strong>New grocery request</strong></p>
+      <p><strong>A customer just placed a new grocery order.</strong></p>
+      <p>You do not need to be on the admin dashboard — review this order from the link below.</p>
       <p>
         <strong>Customer:</strong> ${escapeHtml(params.customerName)}<br />
         <strong>Phone:</strong> ${escapeHtml(params.phoneNumber)}<br />
-        <strong>Reference:</strong> ${escapeHtml(params.referenceNumber)}
+        ${params.customerEmail ? `<strong>Email:</strong> ${escapeHtml(params.customerEmail)}<br />` : ""}
+        <strong>Order reference:</strong> ${escapeHtml(params.referenceNumber)}<br />
+        <strong>Delivery address:</strong> ${escapeHtml(params.gpsAddress)}
       </p>
       <p><strong>Items requested:</strong></p>
       <p style="white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:8px;">${items}</p>
-      <p><a href="${params.adminUrl}">Open in admin dashboard</a></p>
-      <p>— Mama Peace Mini Mart</p>
+      ${notes ? `<p><strong>Special instructions:</strong></p><p style="white-space:pre-wrap;background:#fff8e6;padding:12px;border-radius:8px;">${notes}</p>` : ""}
+      <p style="margin-top:20px;">
+        <a href="${params.adminUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;">
+          Review order in admin
+        </a>
+      </p>
+      <p style="margin-top:16px;color:#666;font-size:14px;">
+        Mama Peace Mini Mart admin notification
+      </p>
     `,
   };
 }

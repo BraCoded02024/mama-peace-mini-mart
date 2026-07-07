@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateReferenceNumber } from "@/lib/reference";
-import { orderSubmittedEmail, adminNewOrderEmail, sendEmail, sendAdminEmail } from "@/lib/email";
+import { orderSubmittedEmail, sendAdminNewOrderNotification, sendEmail } from "@/lib/email";
 
 function normalizeCustomerEmail(email?: string | null) {
   const trimmed = email?.trim().toLowerCase();
@@ -42,15 +42,16 @@ export async function POST(request: Request) {
       });
     }
 
-    await sendAdminEmail(
-      adminNewOrderEmail({
-        customerName: order.customerName,
-        phoneNumber: order.phoneNumber,
-        referenceNumber: order.referenceNumber,
-        itemsRequested: order.itemsRequested,
-        adminUrl: `${base}/admin/orders/${order.id}`,
-      })
-    );
+    await sendAdminNewOrderNotification({
+      customerName: order.customerName,
+      phoneNumber: order.phoneNumber,
+      customerEmail: order.customerEmail,
+      referenceNumber: order.referenceNumber,
+      itemsRequested: order.itemsRequested,
+      gpsAddress: order.gpsAddress,
+      specialInstructions: order.specialInstructions,
+      adminUrl: `${base}/admin/orders/${order.id}`,
+    });
 
     return NextResponse.json({
       referenceNumber: order.referenceNumber,
