@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, HelpCircle, Info, MapPin, Home } from "lucide-react";
 import { TrustFooter } from "@/components/order/trust-footer";
+import { PaymentMerchantNotice } from "@/components/order/payment-merchant-notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,10 @@ export default async function OrderSuccessPage({
           </p>
         </div>
 
+        <div className="mt-6">
+          <PaymentMerchantNotice />
+        </div>
+
         <Card className="mt-8">
           <CardContent className="space-y-4 pt-6">
             <div>
@@ -57,8 +62,9 @@ export default async function OrderSuccessPage({
                   <p className="font-medium">What&apos;s Next?</p>
                   <p className="mt-1 text-sm text-mama-muted">
                     Mama Peace is reviewing your request. Keep this reference
-                    number safe and use Track Order for updates. If you added an
-                    email, we&apos;ll also send updates to your inbox.
+                    number safe and use Track Order for updates. Payment for
+                    online orders is handled only by CODETECHS — see the notice
+                    above. Do not pay any rider, staff member, or third party.
                   </p>
                 </div>
               </div>

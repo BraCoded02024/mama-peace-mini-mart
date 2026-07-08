@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   approveOrderAction,
+  confirmMomoPaymentAction,
   markOrderReadyForPickupAction,
 } from "@/app/actions/orders";
 import {
@@ -24,6 +25,11 @@ import {
   unassignRiderAction,
 } from "@/app/actions/riders";
 import { MIN_ORDER_AMOUNT_GHS, STALE_ASSIGNMENT_MINUTES } from "@/lib/constants";
+import {
+  PAYMENT_METHOD_LABELS,
+  type OrderPaymentMethod,
+} from "@/lib/payment-config";
+import { MomoPaymentInstructions } from "@/components/order/momo-payment-instructions";
 import { toTelHref } from "@/lib/phone";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -63,6 +69,9 @@ export function AdminOrderPanel({
     order.assignedRiderId ?? ""
   );
   const [assignLoading, setAssignLoading] = useState(false);
+  const [paymentMethod, setPaymentMethod] =
+    useState<OrderPaymentMethod>("PAYSTACK");
+  const [momoConfirmLoading, setMomoConfirmLoading] = useState(false);
 
   const activeRiders = riders.filter((r) => r.status === "ACTIVE");
   const canAssignRider = !["DELIVERED", "CANCELLED"].includes(order.status);
@@ -94,6 +103,7 @@ export function AdminOrderPanel({
       deliveryFee: parseFloat(deliveryFee) || 0,
       serviceFee: parseFloat(serviceFee) || 0,
       adminMessage: adminMessage || undefined,
+      paymentMethod,
     });
     setLoading(false);
     if (!result.success) {
@@ -141,6 +151,18 @@ export function AdminOrderPanel({
       return;
     }
     setSelectedRiderId("");
+    router.refresh();
+  }
+
+  async function handleConfirmMomoPayment() {
+    setMomoConfirmLoading(true);
+    setError("");
+    const result = await confirmMomoPaymentAction(order.id);
+    setMomoConfirmLoading(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -248,8 +270,44 @@ export function AdminOrderPanel({
                   Set Pricing &amp; Approve
                 </h3>
                 <p className="text-sm text-mama-muted">
-                  Enter the costs, then send the customer a payment link.
+                  Enter the costs, choose how the customer should pay, then send
+                  payment instructions.
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Payment method to send</Label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(Object.keys(PAYMENT_METHOD_LABELS) as OrderPaymentMethod[]).map(
+                    (method) => (
+                      <label
+                        key={method}
+                        className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-sm transition ${
+                          paymentMethod === method
+                            ? "border-mama-green bg-mama-green/5"
+                            : "border-mama-border bg-white hover:bg-mama-gray"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method}
+                          checked={paymentMethod === method}
+                          onChange={() => setPaymentMethod(method)}
+                          className="mt-1"
+                        />
+                        <span>{PAYMENT_METHOD_LABELS[method]}</span>
+                      </label>
+                    )
+                  )}
+                </div>
+                {paymentMethod === "MTN_MOMO" && (
+                  <p className="text-xs text-mama-muted">
+                    Customer receives MTN numbers 947300 / 0245322173 — Name:
+                    CODETECHS. You confirm payment manually after MoMo is
+                    received.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -319,12 +377,55 @@ export function AdminOrderPanel({
                 className="w-full"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Approve &amp; Send Payment Link
+                Approve &amp; Send Payment Instructions
               </Button>
             </CardContent>
           </Card>
         </>
       )}
+
+      {order.status === "AWAITING_PAYMENT" &&
+        order.paymentMethod === "MTN_MOMO" &&
+        order.totalAmount != null && (
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <h3 className="font-serif text-lg text-mama-ink">
+                Awaiting MTN MoMo Payment
+              </h3>
+              <MomoPaymentInstructions
+                totalAmount={order.totalAmount}
+                referenceNumber={order.referenceNumber}
+              />
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              <Button
+                onClick={handleConfirmMomoPayment}
+                disabled={momoConfirmLoading}
+                className="w-full"
+              >
+                {momoConfirmLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Confirm MoMo Payment Received
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+      {order.status === "AWAITING_PAYMENT" &&
+        order.paymentMethod === "PAYSTACK" && (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-mama-muted">
+                Customer was sent a Paystack payment link. Payment confirms
+                automatically when they pay online.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
       {order.status === "PAYMENT_CONFIRMED" && (
         <Card>

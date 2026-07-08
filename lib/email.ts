@@ -1,4 +1,6 @@
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
+import { PAYMENT_MERCHANT, PAYMENT_AUTHORIZED_NOTICE } from "@/lib/payment-config";
+import type { OrderPaymentMethod } from "@/lib/payment-config";
 
 type EmailPayload = {
   to: string | string[];
@@ -142,12 +144,30 @@ export function orderSubmittedEmail(params: {
   referenceNumber: string;
   trackUrl: string;
 }) {
+  const merchant = PAYMENT_MERCHANT.name;
+  const mtnNumbers = PAYMENT_MERCHANT.mtnNumbers.join(" or ");
+  const notice = PAYMENT_AUTHORIZED_NOTICE;
+
   return {
-    subject: `Order ${params.referenceNumber} received — Mama Peace`,
+    subject: `Order ${params.referenceNumber} received — pending review`,
     html: `
-      <p>Hi ${params.customerName},</p>
-      <p>Your grocery request <strong>${params.referenceNumber}</strong> has been received and is pending review.</p>
-      <p>Track your order: <a href="${params.trackUrl}">${params.trackUrl}</a></p>
+      <p>Hi ${escapeHtml(params.customerName)},</p>
+      <p>Your grocery request <strong>${escapeHtml(params.referenceNumber)}</strong> has been received and is <strong>pending review</strong>.</p>
+      <p>Mama Peace will confirm your items and total price shortly. Track your order here: <a href="${params.trackUrl}">${params.trackUrl}</a></p>
+
+      <div style="margin:24px 0;padding:16px;background:#fff8e6;border:1px solid #f0d080;border-radius:12px;">
+        <p style="margin:0 0 12px;font-weight:700;color:#92400e;">${escapeHtml(notice.heading)}</p>
+        <p style="margin:0 0 8px;">${escapeHtml(notice.operator)}</p>
+        <p style="margin:0 0 8px;background:#fff;padding:12px;border-radius:8px;">
+          <strong>When your order is priced, pay only to:</strong><br />
+          <strong>MTN:</strong> ${escapeHtml(mtnNumbers)}<br />
+          <strong>Name:</strong> ${escapeHtml(merchant)}
+        </p>
+        <p style="margin:0 0 8px;font-size:14px;">${escapeHtml(notice.onlyChannel)}</p>
+        <p style="margin:0 0 8px;font-size:14px;">${escapeHtml(notice.liability)}</p>
+        <p style="margin:0;font-size:14px;font-weight:600;">${escapeHtml(PAYMENT_MERCHANT.dispatchNotice)}</p>
+      </div>
+
       <p>— Mama Peace Mini Mart</p>
     `,
   };
@@ -158,16 +178,40 @@ export function orderAwaitingPaymentEmail(params: {
   referenceNumber: string;
   totalAmount: number;
   paymentUrl: string;
+  paymentMethod: OrderPaymentMethod;
   adminMessage?: string | null;
 }) {
+  const merchant = PAYMENT_MERCHANT.name;
+  const momoNumbers = PAYMENT_MERCHANT.mtnNumbers.join(" or ");
+
+  const paystackBlock = `
+      <p><a href="${params.paymentUrl}" style="display:inline-block;background:#2d6a4f;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;">Pay now with Paystack</a></p>
+      <p>Or view your order: <a href="${params.paymentUrl}">${params.paymentUrl}</a></p>
+    `;
+
+  const momoBlock = `
+      <p><strong>Pay via MTN Mobile Money (${merchant})</strong></p>
+      <p style="background:#f6f6f6;padding:12px;border-radius:8px;">
+        <strong>Amount:</strong> GHS ${params.totalAmount.toFixed(2)}<br />
+        <strong>Merchant name:</strong> ${merchant}<br />
+        <strong>MTN:</strong> ${momoNumbers}<br />
+        <strong>Reference (use as payment note):</strong> ${escapeHtml(params.referenceNumber)}
+      </p>
+      <p style="font-size:14px;">${escapeHtml(PAYMENT_AUTHORIZED_NOTICE.onlyChannel)}</p>
+      <p style="font-size:14px;">${escapeHtml(PAYMENT_AUTHORIZED_NOTICE.liability)}</p>
+      <p>${escapeHtml(PAYMENT_MERCHANT.dispatchNotice)}</p>
+      <p>View order details: <a href="${params.paymentUrl}">${params.paymentUrl}</a></p>
+    `;
+
   return {
     subject: `Your order ${params.referenceNumber} is ready for payment`,
     html: `
-      <p>Hi ${params.customerName},</p>
-      <p>Mama Peace has reviewed your order <strong>${params.referenceNumber}</strong>.</p>
-      ${params.adminMessage ? `<p><em>${params.adminMessage}</em></p>` : ""}
+      <p>Hi ${escapeHtml(params.customerName)},</p>
+      <p>Mama Peace has reviewed your order <strong>${escapeHtml(params.referenceNumber)}</strong>.</p>
+      <p>Online payment for this order is handled by <strong>${merchant}</strong>.</p>
+      ${params.adminMessage ? `<p><em>${escapeHtml(params.adminMessage)}</em></p>` : ""}
       <p><strong>Total: GHS ${params.totalAmount.toFixed(2)}</strong> (minimum order GHS ${MIN_ORDER_AMOUNT_GHS})</p>
-      <p><a href="${params.paymentUrl}">Pay now with Paystack</a></p>
+      ${params.paymentMethod === "MTN_MOMO" ? momoBlock : paystackBlock}
       <p>— Mama Peace Mini Mart</p>
     `,
   };

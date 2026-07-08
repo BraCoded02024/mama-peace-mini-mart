@@ -18,20 +18,12 @@ import {
   sendAdminEmail,
 } from "@/lib/email";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
-import { initializePaystackPayment } from "@/lib/paystack";
+import type { OrderPaymentMethod } from "@/lib/payment-config";
 import type { OrderStatus } from "@prisma/client";
 
 function normalizeCustomerEmail(email?: string | null) {
   const trimmed = email?.trim().toLowerCase();
   return trimmed || null;
-}
-
-function paystackEmailForOrder(phone: string, email?: string | null) {
-  const normalized = normalizeCustomerEmail(email);
-  if (normalized) return normalized;
-
-  const digits = phone.replace(/\D/g, "");
-  return `customer+${digits}@mamapeace.local`;
 }
 
 async function sendCustomerEmail(
@@ -108,6 +100,7 @@ export async function approveOrderAction(data: {
   deliveryFee: number;
   serviceFee?: number;
   adminMessage?: string;
+  paymentMethod: OrderPaymentMethod;
   lineItems?: Array<{
     itemName: string;
     quantity: number;
@@ -131,6 +124,7 @@ export async function approveOrderAction(data: {
       deliveryFee: data.deliveryFee,
       serviceFee,
       totalAmount,
+      paymentMethod: data.paymentMethod,
       adminMessage: data.adminMessage?.trim() || null,
       status: "AWAITING_PAYMENT",
       items: data.lineItems?.length
@@ -147,29 +141,16 @@ export async function approveOrderAction(data: {
     },
   });
 
-  const trackUrl = appUrl(`/track/${order.referenceNumber}`);
-  let paymentUrl = trackUrl;
-  try {
-    const paymentInit = await initializePaystackPayment({
-      email: paystackEmailForOrder(order.phoneNumber, order.customerEmail),
-      amountGhs: totalAmount,
-      reference: `MP-${order.referenceNumber}-${Date.now()}`,
-      metadata: {
-        orderId: order.id,
-        orderReference: order.referenceNumber,
-        phoneNumber: order.phoneNumber,
-      },
-    });
-    paymentUrl = paymentInit.authorization_url;
-  } catch (error) {
-    console.warn("[approveOrder] Paystack unavailable, using track page URL", error);
-  }
+  const trackUrl = appUrl(
+    `/track/${order.referenceNumber}?phone=${encodeURIComponent(order.phoneNumber)}`
+  );
 
   const emailContent = orderAwaitingPaymentEmail({
     customerName: order.customerName,
     referenceNumber: order.referenceNumber,
     totalAmount,
-    paymentUrl,
+    paymentUrl: trackUrl,
+    paymentMethod: data.paymentMethod,
     adminMessage: order.adminMessage,
   });
 
@@ -183,13 +164,36 @@ export async function approveOrderAction(data: {
       Customer: order.customerName,
       Phone: order.phoneNumber,
       Total: `GHS ${totalAmount.toFixed(2)}`,
+      "Payment method":
+        data.paymentMethod === "MTN_MOMO" ? "MTN MoMo (CODETECHS)" : "Paystack",
     },
   });
 
   revalidatePath("/admin");
   revalidatePath(`/track/${order.referenceNumber}`);
 
-  return { success: true as const, paymentUrl };
+  return { success: true as const, paymentUrl: trackUrl };
+}
+
+export async function confirmMomoPaymentAction(orderId: string) {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) {
+    return { success: false as const, error: "Order not found" };
+  }
+  if (order.paymentMethod !== "MTN_MOMO") {
+    return {
+      success: false as const,
+      error: "This order is not awaiting MTN MoMo payment",
+    };
+  }
+  if (order.status !== "AWAITING_PAYMENT") {
+    return {
+      success: false as const,
+      error: "Order is not awaiting payment",
+    };
+  }
+
+  return markOrderPaidAction(orderId, `MOMO-${order.referenceNumber}-${Date.now()}`);
 }
 
 export async function replyToOrderAction(data: {

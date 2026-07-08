@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaymentMerchantNotice } from "@/components/order/payment-merchant-notice";
 
 export default function OrderItemsPage() {
   const router = useRouter();
@@ -70,6 +71,8 @@ export default function OrderItemsPage() {
           Step 2: List the items you need Mama Peace to gather for you.
         </p>
       </div>
+
+      <PaymentMerchantNotice />
 
       <Card className="relative overflow-hidden">
         <CardContent className="space-y-4 pt-6">

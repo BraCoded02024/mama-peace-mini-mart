@@ -23,6 +23,11 @@ enum RiderStatus {
   INACTIVE
 }
 
+enum PaymentMethod {
+  PAYSTACK
+  MTN_MOMO
+}
+
 model Order {
   id                   String      @id @default(cuid())
   referenceNumber      String      @unique
@@ -38,6 +43,7 @@ model Order {
   deliveryFee          Float?
   serviceFee           Float?
   totalAmount          Float?
+  paymentMethod        PaymentMethod?
   adminMessage         String?
   verificationCode     String?
   transactionReference String?

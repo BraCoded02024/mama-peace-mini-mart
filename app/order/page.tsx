@@ -13,6 +13,7 @@ import { isValidPhoneNumber } from "@/lib/phone";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaymentMerchantNotice } from "@/components/order/payment-merchant-notice";
 import { mergeLocationDescription } from "@/lib/location";
 
 export default function OrderDetailsPage() {
@@ -43,6 +44,8 @@ export default function OrderDetailsPage() {
           No account needed — just your details and your shopping list.
         </p>
       </div>
+
+      <PaymentMerchantNotice />
 
       <Card>
         <CardContent className="space-y-4 pt-6">

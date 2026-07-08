@@ -1,8 +1,11 @@
 import { CreditCard, Mail, MapPin, Phone, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PayNowButton } from "@/components/order/pay-now-button";
+import { MomoPaymentInstructions } from "@/components/order/momo-payment-instructions";
+import { PaymentMerchantNotice } from "@/components/order/payment-merchant-notice";
 import { formatCurrency } from "@/lib/utils";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
+import type { OrderPaymentMethod } from "@/lib/payment-config";
 
 type OrderItem = {
   id: string;
@@ -24,6 +27,7 @@ type OrderPaymentSummaryProps = {
   deliveryFee: number | null;
   serviceFee: number | null;
   totalAmount: number;
+  paymentMethod?: OrderPaymentMethod | null;
 };
 
 export function OrderPaymentSummary({
@@ -38,8 +42,10 @@ export function OrderPaymentSummary({
   deliveryFee,
   serviceFee,
   totalAmount,
+  paymentMethod = "PAYSTACK",
 }: OrderPaymentSummaryProps) {
   const belowMinimum = totalAmount < MIN_ORDER_AMOUNT_GHS;
+  const isMomo = paymentMethod === "MTN_MOMO";
 
   return (
     <Card className="mt-4 overflow-hidden border-mama-green">
@@ -49,12 +55,18 @@ export function OrderPaymentSummary({
         </p>
         <h2 className="font-serif text-xl">Your Order Summary</h2>
         <p className="mt-1 text-sm text-white/85">
-          Review your priced items below, then pay securely with Paystack.
+          {isMomo
+            ? "Pay the full total via MTN Mobile Money before dispatch."
+            : "Review your priced items below, then pay securely with Paystack."}
         </p>
       </div>
 
       <CardContent className="space-y-5 p-0">
-        <div className="space-y-3 px-5 pt-5">
+        <div className="px-5 pt-5">
+          <PaymentMerchantNotice compact />
+        </div>
+
+        <div className="space-y-3 px-5">
           <p className="text-xs font-medium uppercase tracking-wider text-mama-muted">
             Your Details
           </p>
@@ -136,20 +148,26 @@ export function OrderPaymentSummary({
         </div>
 
         <div className="space-y-3 border-t border-mama-border bg-white px-5 py-5">
-          <div className="flex items-center gap-2 text-sm text-mama-muted">
-            <CreditCard className="h-4 w-4 text-mama-green" />
-            Pay with card, mobile money, or bank via Paystack
-          </div>
-
           {belowMinimum ? (
             <p className="text-sm text-red-600">
               Minimum order is GHC {MIN_ORDER_AMOUNT_GHS}. Please contact support.
             </p>
-          ) : (
-            <PayNowButton
+          ) : isMomo ? (
+            <MomoPaymentInstructions
+              totalAmount={totalAmount}
               referenceNumber={referenceNumber}
-              phoneNumber={phoneNumber}
             />
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-sm text-mama-muted">
+                <CreditCard className="h-4 w-4 text-mama-green" />
+                Pay with card, mobile money, or bank via Paystack
+              </div>
+              <PayNowButton
+                referenceNumber={referenceNumber}
+                phoneNumber={phoneNumber}
+              />
+            </>
           )}
         </div>
       </CardContent>

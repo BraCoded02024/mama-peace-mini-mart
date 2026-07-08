@@ -210,6 +210,7 @@ export default async function TrackOrderDetailPage({
           deliveryFee={order.deliveryFee}
           serviceFee={order.serviceFee}
           totalAmount={order.totalAmount}
+          paymentMethod={order.paymentMethod}
         />
       )}
 
