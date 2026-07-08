@@ -47,11 +47,17 @@ export function useRiderLiveFeed() {
         seenRef.current.add(key);
 
         const title =
-          order.status === "READY_FOR_PICKUP"
-            ? `New pickup available: ${order.referenceNumber}`
-            : order.status === "RIDER_ASSIGNED"
-              ? `Assigned to you: ${order.referenceNumber}`
-              : `Order ${order.referenceNumber} updated`;
+          order.status === "PENDING_REVIEW"
+            ? `New order available: ${order.referenceNumber}`
+            : order.status === "READY_FOR_PICKUP"
+              ? `Pickup ready: ${order.referenceNumber}`
+              : order.status === "RIDER_ASSIGNED"
+                ? `Assigned to you: ${order.referenceNumber}`
+                : order.status === "AWAITING_PAYMENT"
+                  ? `Awaiting payment: ${order.referenceNumber}`
+                  : order.status === "PAYMENT_CONFIRMED"
+                    ? `Ready to dispatch: ${order.referenceNumber}`
+                    : `Order ${order.referenceNumber} updated`;
 
         newAlerts.push({ id: key, title });
       }

@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Phone, User, Loader2 } from "lucide-react";
+import { MapPin, User, Loader2, Lock } from "lucide-react";
 import { acceptOrderAction } from "@/app/actions/riders";
-import { toTelHref } from "@/lib/phone";
-import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +33,8 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
         <CardContent className="py-10 text-center">
           <p className="font-medium text-mama-ink">No orders available</p>
           <p className="mt-1 text-sm text-mama-muted">
-            New pickups will appear here when the admin marks them ready.
+            New customer orders appear here as soon as they are placed. Accept
+            one and go to the shop to pick items.
           </p>
         </CardContent>
       </Card>
@@ -59,17 +58,10 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
                 </p>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-mama-muted">
                   <User className="h-3.5 w-3.5" />
-                  {order.customerName}
+                  Customer
                 </p>
-                <a
-                  href={toTelHref(order.phoneNumber)}
-                  className="mt-0.5 flex items-center gap-1.5 text-sm text-mama-green hover:underline"
-                >
-                  <Phone className="h-3.5 w-3.5" />
-                  {order.phoneNumber}
-                </a>
               </div>
-              <Badge variant="success">Paid</Badge>
+              <Badge variant="muted">New order</Badge>
             </div>
 
             <div className="flex items-start gap-2 text-sm text-mama-ink">
@@ -77,21 +69,13 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
               <span>{order.gpsAddress}</span>
             </div>
 
-            {order.specialInstructions && (
-              <p className="rounded-xl bg-mama-gray px-3 py-2 text-sm text-mama-muted">
-                <span className="font-medium text-mama-ink">Note: </span>
-                {order.specialInstructions}
-              </p>
-            )}
-
-            {order.totalAmount != null && (
-              <p className="text-sm">
-                <span className="text-mama-muted">Estimated total: </span>
-                <span className="font-semibold text-mama-ink">
-                  {formatCurrency(order.totalAmount)}
-                </span>
-              </p>
-            )}
+            <div className="flex items-start gap-2 rounded-xl bg-mama-gray px-3 py-2 text-sm text-mama-muted">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Items and customer contact are revealed once you accept this
+                order.
+              </span>
+            </div>
 
             <Button
               className="w-full"
@@ -101,7 +85,7 @@ export function AvailableOrdersList({ orders }: { orders: Order[] }) {
               {loadingId === order.id && (
                 <Loader2 className="h-4 w-4 animate-spin" />
               )}
-              Accept
+              Accept & go to shop
             </Button>
           </CardContent>
         </Card>

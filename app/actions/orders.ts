@@ -13,7 +13,6 @@ import {
   adminPaymentReceivedEmail,
   notifyAdminActivity,
   sendAdminNewOrderNotification,
-  getAdminRecipients,
   sendEmail,
   sendAdminEmail,
 } from "@/lib/email";
@@ -68,16 +67,7 @@ export async function createOrderAction(data: {
     trackUrl,
   });
 
-  const adminRecipients = getAdminRecipients();
-  const customerEmail = normalizeCustomerEmail(order.customerEmail);
-
-  if (customerEmail) {
-    await sendEmail({
-      to: customerEmail,
-      bcc: adminRecipients.length > 0 ? adminRecipients : undefined,
-      ...emailContent,
-    });
-  }
+  await sendCustomerEmail(order.customerEmail, emailContent);
 
   await sendAdminNewOrderNotification({
     customerName: order.customerName,
@@ -91,6 +81,7 @@ export async function createOrderAction(data: {
   });
 
   revalidatePath("/admin");
+  revalidatePath("/riders");
   return { referenceNumber: order.referenceNumber };
 }
 

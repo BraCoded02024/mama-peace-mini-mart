@@ -5,39 +5,27 @@ import { prisma } from "@/lib/prisma";
 import { getRiderSession } from "@/lib/rider-auth";
 import { riderLogoutAction } from "@/app/actions/rider-auth";
 import { AvailableOrdersList } from "@/components/rider/available-orders-list";
-import { AssignedOrdersList } from "@/components/rider/assigned-orders-list";
 import { CurrentDeliveryCard } from "@/components/rider/current-delivery-card";
 import { RiderLiveBanner } from "@/components/rider/rider-live-banner";
 import { RiderPortalError } from "@/components/rider/rider-portal-error";
 import { Badge } from "@/components/ui/badge";
+import {
+  RIDER_ACTIVE_STATUSES,
+  RIDER_POOL_STATUSES,
+} from "@/lib/order-rider-flow";
 
 export default async function RiderPortalPage() {
   const session = await getRiderSession();
   if (!session) redirect("/riders/login");
 
-  let assignedOrders;
   let availableOrders;
   let currentDelivery;
 
   try {
-    [assignedOrders, availableOrders, currentDelivery] = await Promise.all([
+    [availableOrders, currentDelivery] = await Promise.all([
       prisma.order.findMany({
         where: {
-          assignedRiderId: session.id,
-          status: {
-            in: [
-              "PENDING_REVIEW",
-              "AWAITING_PAYMENT",
-              "PAYMENT_CONFIRMED",
-              "READY_FOR_PICKUP",
-            ],
-          },
-        },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.order.findMany({
-        where: {
-          status: "READY_FOR_PICKUP",
+          status: { in: RIDER_POOL_STATUSES },
           assignedRiderId: null,
         },
         orderBy: { updatedAt: "desc" },
@@ -45,7 +33,7 @@ export default async function RiderPortalPage() {
       prisma.order.findFirst({
         where: {
           assignedRiderId: session.id,
-          status: { in: ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"] },
+          status: { in: RIDER_ACTIVE_STATUSES },
         },
         orderBy: { updatedAt: "desc" },
       }),
@@ -107,23 +95,14 @@ export default async function RiderPortalPage() {
             <CurrentDeliveryCard order={currentDelivery} />
           </section>
         ) : (
-          <>
-            {assignedOrders.length > 0 && (
-              <section className="space-y-3">
-                <h2 className="font-serif text-xl text-mama-ink">
-                  My Assigned Orders
-                </h2>
-                <AssignedOrdersList orders={assignedOrders} canAccept />
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <h2 className="font-serif text-xl text-mama-ink">
-                Available Orders
-              </h2>
-              <AvailableOrdersList orders={availableOrders} />
-            </section>
-          </>
+          <section className="space-y-3">
+            <h2 className="font-serif text-xl text-mama-ink">Available Orders</h2>
+            <p className="text-sm text-mama-muted">
+              New customer orders appear here immediately. Accept one, go to the
+              shop, call out items to Mama Peace, then enter the total price.
+            </p>
+            <AvailableOrdersList orders={availableOrders} />
+          </section>
         )}
       </main>
     </div>

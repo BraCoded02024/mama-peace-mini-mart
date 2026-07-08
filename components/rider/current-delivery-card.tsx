@@ -9,9 +9,15 @@ import {
   Loader2,
   Package,
   CheckCheck,
+  ShoppingBasket,
 } from "lucide-react";
-import { riderUpdateOrderStatusAction } from "@/app/actions/riders";
+import {
+  riderConfirmPaymentAction,
+  riderUpdateOrderStatusAction,
+} from "@/app/actions/riders";
 import { resolveOrderMapsUrl, stripMapPinNote } from "@/lib/location";
+import { MomoPaymentInstructions } from "@/components/order/momo-payment-instructions";
+import { RiderShopPriceForm } from "@/components/rider/rider-shop-price-form";
 import { toTelHref } from "@/lib/phone";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,10 +38,17 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
     ? stripMapPinNote(order.locationDescription)
     : "";
 
-  async function handlePickedUp() {
+  const canDispatchLegacy =
+    order.status === "RIDER_ASSIGNED" && order.totalAmount != null;
+  const canDispatchPaid = order.status === "PAYMENT_CONFIRMED";
+
+  async function handleDispatch() {
     setLoading(true);
     setError("");
-    const result = await riderUpdateOrderStatusAction(order.id, "OUT_FOR_DELIVERY");
+    const result = await riderUpdateOrderStatusAction(
+      order.id,
+      "OUT_FOR_DELIVERY"
+    );
     setLoading(false);
     if (!result.success) {
       setError(result.error);
@@ -56,11 +69,23 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
     router.refresh();
   }
 
+  async function handleConfirmPayment() {
+    setLoading(true);
+    setError("");
+    const result = await riderConfirmPaymentAction(order.id);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <Card className="overflow-hidden">
       <div className="border-b border-mama-border bg-mama-green px-5 py-4 text-white">
         <p className="text-[10px] uppercase tracking-wider text-mama-cream/80">
-          Current Delivery
+          Active Order
         </p>
         <div className="mt-1 flex items-center justify-between gap-3">
           <h2 className="font-serif text-xl">{order.referenceNumber}</h2>
@@ -69,6 +94,16 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
       </div>
 
       <CardContent className="space-y-4 pt-5">
+        <div className="rounded-xl border border-mama-border bg-mama-gray/60 p-3 text-sm">
+          <p className="mb-1 flex items-center gap-2 font-medium text-mama-ink">
+            <ShoppingBasket className="h-4 w-4 text-mama-green" />
+            Items requested
+          </p>
+          <p className="whitespace-pre-wrap text-mama-ink">
+            {order.itemsRequested}
+          </p>
+        </div>
+
         <div className="space-y-2 text-sm">
           <p className="flex items-center gap-2 text-mama-ink">
             <User className="h-4 w-4 text-mama-green" />
@@ -100,7 +135,37 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
           </p>
         )}
 
-        {order.totalAmount != null && (
+        {order.status === "RIDER_ASSIGNED" && order.totalAmount == null && (
+          <RiderShopPriceForm orderId={order.id} />
+        )}
+
+        {order.status === "AWAITING_PAYMENT" && order.totalAmount != null && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-mama-ink">
+              Total: {formatCurrency(order.totalAmount)}
+            </p>
+            <p className="text-sm text-mama-muted">
+              Waiting for customer payment. Confirm below once Mama Peace /
+              CODETECHS receives the MoMo payment.
+            </p>
+            {order.paymentMethod === "MTN_MOMO" && (
+              <MomoPaymentInstructions
+                totalAmount={order.totalAmount}
+                referenceNumber={order.referenceNumber}
+              />
+            )}
+            <Button
+              onClick={handleConfirmPayment}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirm payment received
+            </Button>
+          </div>
+        )}
+
+        {order.totalAmount != null && order.status !== "AWAITING_PAYMENT" && (
           <p className="text-sm font-semibold text-mama-ink">
             Total: {formatCurrency(order.totalAmount)}
           </p>
@@ -122,11 +187,11 @@ export function CurrentDeliveryCard({ order }: { order: Order }) {
         )}
 
         <div className="grid gap-2 sm:grid-cols-2">
-          {order.status === "RIDER_ASSIGNED" && (
-            <Button onClick={handlePickedUp} disabled={loading} className="w-full">
+          {(canDispatchPaid || canDispatchLegacy) && (
+            <Button onClick={handleDispatch} disabled={loading} className="w-full">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               <Package className="h-4 w-4" />
-              Picked Up
+              Dispatch order
             </Button>
           )}
           {order.status === "OUT_FOR_DELIVERY" && (

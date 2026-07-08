@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRiderSession } from "@/lib/rider-auth";
+import {
+  RIDER_ACTIVE_STATUSES,
+  RIDER_POOL_STATUSES,
+} from "@/lib/order-rider-flow";
 
 export async function GET(request: Request) {
   const session = await getRiderSession();
@@ -20,14 +24,7 @@ export async function GET(request: Request) {
     prisma.order.findMany({
       where: {
         assignedRiderId: session.id,
-        status: {
-          in: [
-            "PENDING_REVIEW",
-            "AWAITING_PAYMENT",
-            "PAYMENT_CONFIRMED",
-            "READY_FOR_PICKUP",
-          ],
-        },
+        status: { in: RIDER_ACTIVE_STATUSES },
         updatedAt: { gt: since },
       },
       orderBy: { updatedAt: "desc" },
@@ -40,7 +37,7 @@ export async function GET(request: Request) {
     }),
     prisma.order.findMany({
       where: {
-        status: "READY_FOR_PICKUP",
+        status: { in: RIDER_POOL_STATUSES },
         assignedRiderId: null,
         updatedAt: { gt: since },
       },
@@ -55,7 +52,7 @@ export async function GET(request: Request) {
     prisma.order.findFirst({
       where: {
         assignedRiderId: session.id,
-        status: { in: ["RIDER_ASSIGNED", "OUT_FOR_DELIVERY"] },
+        status: { in: RIDER_ACTIVE_STATUSES },
         updatedAt: { gt: since },
       },
       select: {
