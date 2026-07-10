@@ -69,6 +69,12 @@ export function SplashScreen() {
         />
       </div>
 
+      <p className="shrink-0 px-8 pb-2 text-center font-serif text-xs italic leading-relaxed tracking-wide text-mama-muted sm:px-12 sm:text-sm">
+        If God be for Us,
+        <br />
+        who can stand against us
+      </p>
+
       <div className="shrink-0 px-8 pb-10 pt-4 sm:px-12 sm:pb-12">
         <p className="mb-3 text-center text-xs font-medium tracking-wide text-mama-muted">
           Getting things ready
