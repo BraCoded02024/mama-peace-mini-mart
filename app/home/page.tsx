@@ -3,6 +3,7 @@ import { MarketHero, MarketFeatures } from "@/components/home/market-hero";
 import { MarketCategories } from "@/components/home/market-catalog";
 import { MarketProductShowcase } from "@/components/home/market-product-showcase";
 import {
+  MarketOpeningHours,
   MarketWhyShop,
   MarketDeliveryBanner,
   MarketHowItWorks,
@@ -17,6 +18,7 @@ export default function HomePage() {
       <div className="space-y-5 lg:space-y-3">
         <MarketHero />
         <MarketFeatures />
+        <MarketOpeningHours />
         <MarketCategories />
         <MarketProductShowcase />
         <MarketWhyShop />

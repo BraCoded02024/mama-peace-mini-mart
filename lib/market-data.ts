@@ -5,6 +5,11 @@ export const MARKET_CONTACT = {
   email: "orders@mamapeacemart.com",
 } as const;
 
+export const MARKET_HOURS = [
+  { days: "Monday – Saturday", hours: "9:00 AM – 6:00 PM" },
+  { days: "Sunday", hours: "2:00 PM – 6:00 PM" },
+] as const;
+
 export const marketFeatures = [
   { title: "Quality Products", subtitle: "Carefully Selected" },
   { title: "Fresh & Reliable", subtitle: "Every Time" },

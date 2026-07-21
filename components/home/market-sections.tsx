@@ -8,6 +8,7 @@ import {
   MapPin,
   Phone,
   Mail,
+  Clock,
 } from "lucide-react";
 import {
   whyShopItems,
@@ -16,7 +17,32 @@ import {
   footerQuickLinks,
   MARKET_LOCATION,
   MARKET_CONTACT,
+  MARKET_HOURS,
 } from "@/lib/market-data";
+
+export function MarketOpeningHours() {
+  return (
+    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-mama-border/60">
+      <div className="flex items-center gap-2">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mama-green/10">
+          <Clock className="h-4 w-4 text-mama-green" />
+        </span>
+        <h2 className="font-serif text-base font-bold text-mama-green">Opening Hours</h2>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {MARKET_HOURS.map((entry) => (
+          <li
+            key={entry.days}
+            className="flex items-baseline justify-between gap-3 text-sm text-mama-ink"
+          >
+            <span className="font-medium">{entry.days}</span>
+            <span className="text-right text-mama-muted">{entry.hours}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export function MarketWhyShop() {
   return (
@@ -209,6 +235,16 @@ export function MarketFooter() {
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mama-yellow" />
                 {MARKET_LOCATION}, Ghana
+              </li>
+              <li className="flex items-start gap-2">
+                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mama-yellow" />
+                <span>
+                  {MARKET_HOURS.map((entry) => (
+                    <span key={entry.days} className="block">
+                      {entry.days}: {entry.hours}
+                    </span>
+                  ))}
+                </span>
               </li>
             </ul>
             <div className="mt-3 flex gap-2">

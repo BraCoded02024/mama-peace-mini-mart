@@ -19,11 +19,13 @@ import {
   Headphones,
   Phone,
   Mail,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   MARKET_LOCATION,
   MARKET_CONTACT,
+  MARKET_HOURS,
   howItWorksSteps,
 } from "@/lib/market-data";
 import { MIN_ORDER_AMOUNT_GHS } from "@/lib/constants";
@@ -292,6 +294,16 @@ function DesktopBrandPanel() {
             <MapPin className="h-3.5 w-3.5 shrink-0 text-mama-yellow" />
             {MARKET_LOCATION}, Ghana
           </p>
+          <div className="flex items-start gap-2">
+            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mama-yellow" />
+            <span>
+              {MARKET_HOURS.map((entry) => (
+                <span key={entry.days} className="block">
+                  {entry.days}: {entry.hours}
+                </span>
+              ))}
+            </span>
+          </div>
         </div>
 
         <div className="mt-auto flex flex-wrap gap-2 pt-4">
